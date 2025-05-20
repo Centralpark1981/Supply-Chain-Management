@@ -1,0 +1,154 @@
+# ddmrp_buffer.py – DDMRP Buffer Calculator (Improved)
+# Features: Input validation, color output, better visualization
+
+import matplotlib.pyplot as plt
+from collections import OrderedDict
+
+# Color codes for terminal output
+COLORS = {
+    "HEADER": "\033[95m",
+    "BLUE": "\033[94m",
+    "GREEN": "\033[92m",
+    "YELLOW": "\033[93m",
+    "RED": "\033[91m",
+    "ENDC": "\033[0m",
+}
+
+def get_float(prompt: str, default: float = None, min_val: float = 0) -> float:
+    """Get validated float input with default value support."""
+    while True:
+        try:
+            raw = input(f"{COLORS['BLUE']}➔ {prompt}{f' (default: {default})' if default else ''}: {COLORS['ENDC']}").strip()
+            value = float(raw) if raw else default
+            
+            if value is None:
+                raise ValueError("Value required")
+                
+            if value < min_val:
+                print(f"{COLORS['RED']}⛔ Value must be ≥ {min_val}{COLORS['ENDC']}")
+                continue
+                
+            return value
+        except (ValueError, TypeError):
+            print(f"{COLORS['RED']}⛔ Invalid input. Please enter a number.{COLORS['ENDC']}")
+
+def calculate_zones(params: dict) -> dict:
+    """Calculate all DDMRP zones and metrics."""
+    calc = {}
+    
+    # Zone calculations
+    calc["yellow"] = params["ADU"] * params["DLT"]
+    
+    green_candidates = OrderedDict([
+        ("MOQ", params["MOQ"]),
+        ("Order cycle × ADU", params["order_cycle"] * params["ADU"]),
+        ("LTF × ADU × DLT", params["LTF"] * params["ADU"] * params["DLT"])
+    ])
+    
+    calc["green"] = max(green_candidates.values())
+    calc["red_base"] = params["LTF"] * params["ADU"] * params["DLT"]
+    calc["red_safety"] = calc["red_base"] * params["VF"]
+    calc["red_total"] = calc["red_base"] + calc["red_safety"]
+    
+    # Top of zones
+    calc["TO_green"] = calc["green"] + calc["yellow"] + calc["red_total"]
+    calc["TO_yellow"] = calc["yellow"] + calc["red_total"]
+    calc["TO_red"] = calc["red_total"]
+    
+    # Metrics
+    calc["avg_IP"] = calc["red_total"] + calc["green"] / 2
+    calc["max_OH"] = calc["red_total"] + calc["green"]
+    calc["avg_order_freq"] = calc["green"] / params["ADU"]
+    calc["days_of_safety"] = calc["red_total"] / params["ADU"]
+    calc["avg_open_orders"] = calc["yellow"] / calc["green"]
+    
+    return calc
+
+def display_results(params: dict, calc: dict):
+    """Display results with formatted output."""
+    print(f"\n{COLORS['HEADER']}📊 === CALCULATION RESULTS ==={COLORS['ENDC']}")
+    
+    print(f"\n{COLORS['YELLOW']}🟨 Yellow Zone (ADU × DLT): {calc['yellow']:.0f}{COLORS['ENDC']}")
+    
+    print(f"\n{COLORS['GREEN']}🟩 Green Zone Candidates:")
+    for name, value in calc["green_candidates"].items():
+        print(f"   {name+':':<20} {value:.0f}")
+    print(f"   → Selected Green Zone: {calc['green']:.0f}{COLORS['ENDC']}")
+    
+    print(f"\n{COLORS['RED']}🟥 Red Zone:")
+    print(f"   Base:      {calc['red_base']:.0f}")
+    print(f"   Safety:    {calc['red_safety']:.0f}")
+    print(f"   Total:     {calc['red_total']:.0f}{COLORS['ENDC']}")
+    
+    print(f"\n{COLORS['BLUE']}📈 Key Metrics:")
+    print(f"   TO Green:  {calc['TO_green']:.0f}")
+    print(f"   TO Yellow: {calc['TO_yellow']:.0f}")
+    print(f"   TO Red:    {calc['TO_red']:.0f}")
+    print(f"   Avg IP:    {calc['avg_IP']:.0f}")
+    print(f"   Max OH:    {calc['max_OH']:.0f}")
+    print(f"\n   Order Frequency: {calc['avg_order_freq']:.1f} days")
+    print(f"   Safety Days:    {calc['days_of_safety']:.1f}")
+    print(f"   Open Orders:    {calc['avg_open_orders']:.1f}{COLORS['ENDC']}")
+
+def plot_buffer(calc: dict):
+    """Create enhanced visualization of the buffer zones."""
+    plt.figure(figsize=(10, 6))
+    zones = [
+        ("Red Zone", calc["red_total"], 'red'),
+        ("Yellow Zone", calc["yellow"], 'gold'),
+        ("Green Zone", calc["green"], 'green')
+    ]
+    
+    bottom = 0
+    for name, value, color in zones:
+        plt.barh("Buffer", value, left=bottom, color=color, edgecolor='black', height=0.5)
+        plt.text(bottom + value/2, 0, 
+                 f"{name}\n{value:.0f} units", 
+                 ha='center', va='center',
+                 color='white' if color != 'gold' else 'black',
+                 fontweight='bold')
+        bottom += value
+    
+    plt.axhline(y=0.25, color='black', linestyle='--', alpha=0.5)
+    plt.text(calc["TO_green"] * 1.05, 0, 'Buffer Levels', rotation=90, va='center')
+    
+    plt.scatter([calc["avg_IP"]], [0.25], 
+                color='blue', s=200, 
+                zorder=5, label=f'Avg IP ({calc["avg_IP"]:.0f})')
+    
+    plt.xlim(0, calc["TO_green"] * 1.2)
+    plt.ylim(-0.5, 1)
+    plt.xlabel('Units')
+    plt.title('DDMRP Buffer Profile', fontsize=14, fontweight='bold')
+    plt.legend(loc='upper right')
+    plt.yticks([])
+    plt.grid(axis='x', alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+def main():
+    print(f"\n{COLORS['HEADER']}📥 === DDMRP BUFFER CALCULATOR ==={COLORS['ENDC']}")
+    
+    # Get input parameters with sensible defaults
+    params = {
+        "ADU": get_float("Average Daily Usage (ADU)", min_val=0.1),
+        "LTF": get_float("Lead Time Factor (LTF)", default=1.5, min_val=1),
+        "VF": get_float("Variability Factor (VF)", default=0.5, min_val=0),
+        "MOQ": get_float("Minimum Order Quantity (units)", default=0, min_val=0),
+        "order_cycle": get_float("Order Cycle (days)", default=7, min_val=1),
+        "DLT": get_float("Decoupled Lead Time (days)", default=10, min_val=1)
+    }
+    
+    # Perform calculations
+    calc = calculate_zones(params)
+    calc["green_candidates"] = params.pop("green_candidates", None)
+    
+    # Display results
+    display_results(params, calc)
+    
+    # Generate plot
+    print(f"\n{COLORS['HEADER']}📈 Generating visualization...{COLORS['ENDC']}")
+    plot_buffer(calc)
+
+if __name__ == "__main__":
+    main()
