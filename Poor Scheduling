@@ -1,0 +1,128 @@
+# Poor Scheduling Simulation
+import datetime
+
+# --- Configuration ---
+# Changeover times (in hours) between product types
+CHANGEOVER_MATRIX = {
+    ("None", "ProductA"): 0.5, # Initial setup
+    ("None", "ProductB"): 0.7,
+    ("None", "ProductC"): 0.6,
+    ("ProductA", "ProductB"): 1.5,
+    ("ProductA", "ProductC"): 2.0,
+    ("ProductA", "ProductA"): 0.1, # Minor adjustment even for same product type
+    ("ProductB", "ProductA"): 1.2,
+    ("ProductB", "ProductC"): 1.8,
+    ("ProductB", "ProductB"): 0.1,
+    ("ProductC", "ProductA"): 2.2,
+    ("ProductC", "ProductB"): 1.6,
+    ("ProductC", "ProductC"): 0.1,
+}
+
+# Job List: (job_id, product_type, processing_time_hours, material_ready_datetime_str, due_datetime_str)
+JOBS_DATA = [
+    ("J001", "ProductA", 4, "2025-05-22 08:00", "2025-05-23 17:00"),
+    ("J002", "ProductB", 6, "2025-05-22 09:00", "2025-05-24 12:00"),
+    ("J003", "ProductA", 3, "2025-05-22 08:00", "2025-05-23 10:00"),
+    ("J004", "ProductC", 5, "2025-05-22 10:00", "2025-05-24 17:00"),
+    ("J005", "ProductB", 4, "2025-05-22 11:00", "2025-05-23 18:00"),
+    ("J006", "ProductA", 5, "2025-05-22 08:00", "2025-05-24 09:00"),
+]
+
+def parse_datetime(dt_str):
+    return datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+
+def calculate_schedule_time(schedule_job_ids, jobs_data_map, changeover_matrix, start_time_str="2025-05-22 07:00"):
+    """Calculates total time for a given job schedule."""
+    current_time = parse_datetime(start_time_str)
+    total_changeover_time = 0
+    total_processing_time = 0
+    total_wait_time_material = 0
+    last_product_type = "None"
+    job_completion_times = {}
+    
+    print(f"\n🗓️ Evaluating Schedule: {' -> '.join(schedule_job_ids)}")
+    print(f"{'Job ID':<7} | {'Product':<10} | {'Mat.Ready':<16} | {'Start Time':<16} | {'Chng.Over(h)':<13} | {'Proc.(h)':<8} | {'End Time':<16} | {'Due Time':<16} | {'Tardy(h)':<8}")
+    print("-" * 130)
+
+    for job_id in schedule_job_ids:
+        job = jobs_data_map[job_id]
+        job_product_type = job["product_type"]
+        job_processing_time = job["processing_time_hours"]
+        material_ready_time = job["material_ready_datetime"]
+        due_time = job["due_datetime"]
+
+        # Wait for material if necessary
+        wait_for_material_interval = 0
+        if current_time < material_ready_time:
+            wait_for_material_interval = (material_ready_time - current_time).total_seconds() / 3600
+            total_wait_time_material += wait_for_material_interval
+            current_time = material_ready_time
+            print(f"  INFO: Waiting {wait_for_material_interval:.2f}h for materials for {job_id} until {current_time.strftime('%Y-%m-%d %H:%M')}")
+
+        # Calculate changeover
+        changeover_key = (last_product_type, job_product_type)
+        changeover = changeover_matrix.get(changeover_key, 0) # Default to 0 if key not found
+        
+        job_start_time = current_time + datetime.timedelta(hours=changeover)
+        
+        total_changeover_time += changeover
+        current_time += datetime.timedelta(hours=changeover) # Add changeover time
+
+        # Processing
+        job_actual_start_time_for_log = current_time # Time when processing actually starts
+        current_time += datetime.timedelta(hours=job_processing_time)
+        total_processing_time += job_processing_time
+        job_completion_times[job_id] = current_time
+        last_product_type = job_product_type
+
+        tardiness_hours = max(0, (current_time - due_time).total_seconds() / 3600)
+
+        print(f"{job_id:<7} | {job_product_type:<10} | {material_ready_time.strftime('%y-%m-%d %H:%M'):<16} | {job_actual_start_time_for_log.strftime('%y-%m-%d %H:%M'):<16} | {changeover:<13.1f} | {job_processing_time:<8.1f} | {current_time.strftime('%y-%m-%d %H:%M'):<16} | {due_time.strftime('%y-%m-%d %H:%M'):<16} | {tardiness_hours:<8.2f}")
+
+    total_duration_hours = (current_time - parse_datetime(start_time_str)).total_seconds() / 3600
+    total_tardiness = sum(max(0, (job_completion_times[job_id] - jobs_data_map[job_id]["due_datetime"]).total_seconds() / 3600) for job_id in schedule_job_ids)
+    
+    print(f"--- Schedule Summary ---")
+    print(f"  Total Duration: {total_duration_hours:.2f} hours")
+    print(f"  Total Processing Time: {total_processing_time:.2f} hours")
+    print(f"  Total Changeover Time: {total_changeover_time:.2f} hours")
+    print(f"  Total Material Wait Time: {total_wait_time_material:.2f} hours")
+    print(f"  Total Tardiness: {total_tardiness:.2f} hours")
+    return total_duration_hours, total_changeover_time, total_tardiness
+
+
+# Prepare jobs data map
+jobs_map = {job[0]: {"job_id": job[0], "product_type": job[1], "processing_time_hours": job[2], 
+                     "material_ready_datetime": parse_datetime(job[3]), "due_datetime": parse_datetime(job[4])} 
+            for job in JOBS_DATA}
+
+# --- Define Schedules ---
+# Schedule 1: Naive order (as received)
+schedule1_ids = [job[0] for job in JOBS_DATA]
+
+# Schedule 2: Group by Product Type (simple optimization)
+schedule2_ids = sorted([job[0] for job in JOBS_DATA], key=lambda jid: jobs_map[jid]["product_type"])
+
+# Schedule 3: Earliest Due Date (EDD)
+schedule3_ids = sorted([job[0] for job in JOBS_DATA], key=lambda jid: jobs_map[jid]["due_datetime"])
+
+
+# --- Simulate and Compare ---
+print("\n--- Poor Scheduling Simulation & Comparison ---")
+print("Comparing different job schedules...")
+
+duration1, changeover1, tardiness1 = calculate_schedule_time(schedule1_ids, jobs_map, CHANGEOVER_MATRIX)
+duration2, changeover2, tardiness2 = calculate_schedule_time(schedule2_ids, jobs_map, CHANGEOVER_MATRIX)
+duration3, changeover3, tardiness3 = calculate_schedule_time(schedule3_ids, jobs_map, CHANGEOVER_MATRIX)
+
+print("\n--- Overall Comparison ---")
+print(f"{'Schedule':<25} | {'Total Duration (h)':<20} | {'Changeover (h)':<16} | {'Tardiness (h)':<15}")
+print("-" * 80)
+print(f"{'1. Naive Order':<25} | {duration1:<20.2f} | {changeover1:<16.2f} | {tardiness1:<15.2f}")
+print(f"{'2. Grouped by Product':<25} | {duration2:<20.2f} | {changeover2:<16.2f} | {tardiness2:<15.2f}")
+print(f"{'3. Earliest Due Date':<25} | {duration3:<20.2f} | {changeover3:<16.2f} | {tardiness3:<15.2f}")
+
+if changeover2 < changeover1 :
+    print("\n💡 Grouping by product type significantly reduced changeover time.")
+if tardiness3 < tardiness1 and tardiness3 < tardiness2:
+    print("💡 Earliest Due Date scheduling minimized total tardiness.")
