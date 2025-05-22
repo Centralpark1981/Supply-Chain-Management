@@ -1,0 +1,22 @@
+import pandas as pd
+from functools import reduce
+
+def integrate_team_data():
+    # Load data from different departments
+    sales = pd.read_csv('sales_forecast.csv')
+    marketing = pd.read_csv('marketing_plans.csv')
+    operations = pd.read_csv('production_capacity.csv')
+    
+    # Merge datasets
+    dfs = [sales, marketing, operations]
+    merged = reduce(lambda left,right: pd.merge(left,right,on='date'), dfs)
+    
+    # Create unified metrics
+    merged['required_capacity'] = merged['sales_forecast'] * merged['promo_factor']
+    merged['capacity_gap'] = merged['required_capacity'] - merged['production_capacity']
+    
+    # Save shared view
+    merged.to_csv('collaborative_forecast.csv', index=False)
+    return merged
+
+collab_data = integrate_team_data()
