@@ -1,0 +1,42 @@
+class ContingencyManager:
+    def __init__(self):
+        self.playbook = {
+            'weather': {
+                'alert': "Severe weather detected",
+                'actions': [
+                    "Reroute shipments to alternative warehouses",
+                    "Activate weather-resistant packaging protocols",
+                    "Notify affected customers about potential delays"
+                ]
+            },
+            'strike': {
+                'alert': "Labor strike reported",
+                'actions': [
+                    "Activate alternative carrier agreements",
+                    "Prioritize critical shipments",
+                    "Engage in mediation talks"
+                ]
+            },
+            'customs': {
+                'alert': "Customs delay occurred",
+                'actions': [
+                    "Submit expedited clearance request",
+                    "Verify documentation completeness",
+                    "Engage local customs broker"
+                ]
+            }
+        }
+    
+    def handle_disruption(self, disruption_type):
+        response = self.playbook.get(disruption_type, {
+            'alert': "Unknown disruption",
+            'actions': ["Implement general contingency protocol"]
+        })
+        print(f"ALERT: {response['alert']}")
+        print("Recommended actions:")
+        for i, action in enumerate(response['actions'], 1):
+            print(f"{i}. {action}")
+
+# Usage
+cm = ContingencyManager()
+cm.handle_disruption('weather')
