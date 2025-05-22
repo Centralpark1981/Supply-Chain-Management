@@ -1,0 +1,29 @@
+from prophet import Prophet
+import pandas as pd
+
+def long_term_forecast():
+    data = pd.read_csv('historical_data.csv')
+    data.columns = ['ds', 'y']
+    
+    model = Prophet(
+        yearly_seasonality=True,
+        weekly_seasonality=False,
+        daily_seasonality=False,
+        changepoint_prior_scale=0.8  # Capture long-term trends
+    )
+    
+    # Add economic indicators
+    model.add_regressor('gdp_growth')
+    model.add_regressor('population_growth')
+    
+    model.fit(data)
+    
+    # Create 2-year future scenario
+    future = model.make_future_dataframe(periods=730, freq='D')
+    future['gdp_growth'] = 0.02  # Economic assumptions
+    future['population_growth'] = 0.015
+    
+    forecast = model.predict(future)
+    return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+long_term_prediction = long_term_forecast()
