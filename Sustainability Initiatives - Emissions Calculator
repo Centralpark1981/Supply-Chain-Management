@@ -1,0 +1,26 @@
+class EmissionsOptimizer:
+    CO2_PER_KM = {
+        'truck': 0.15,    # kg CO2 per ton-km
+        'train': 0.04,
+        'ship': 0.03
+    }
+    
+    def __init__(self):
+        self.transport_modes = list(self.CO2_PER_KM.keys())
+        
+    def calculate_emissions(self, distance, weight, mode='truck'):
+        return distance * weight * self.CO2_PER_KM[mode]
+    
+    def recommend_alternatives(self, distance, weight):
+        current = self.calculate_emissions(distance, weight, 'truck')
+        return {
+            mode: {
+                'emissions': self.calculate_emissions(distance, weight, mode),
+                'reduction_pct': round((current - self.calculate_emissions(distance, weight, mode))/current*100, 1)
+            } for mode in self.transport_modes if mode != 'truck'
+        }
+
+# Usage
+optimizer = EmissionsOptimizer()
+print(f"Truck Emissions: {optimizer.calculate_emissions(1000, 20)} kg CO2")
+print("Alternatives:", optimizer.recommend_alternatives(1000, 20))
