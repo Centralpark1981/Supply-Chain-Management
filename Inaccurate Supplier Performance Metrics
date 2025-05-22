@@ -1,0 +1,114 @@
+# Inaccurate Supplier Performance Metrics
+import datetime
+
+# Simulated delivery and quality data (in a real system, this would come from goods receipt and quality inspection processes)
+supplier_deliveries_db = {
+    "SupplierA": [
+        {"order_id": "ORD001", "promised_delivery_date": "2024-05-10", "actual_delivery_date": "2024-05-11", "quality_rating": 4.5, "items_defective": 0, "items_total": 100}, # 1 day late
+        {"order_id": "ORD004", "promised_delivery_date": "2024-05-15", "actual_delivery_date": "2024-05-14", "quality_rating": 5.0, "items_defective": 0, "items_total": 50},  # 1 day early
+    ],
+    "SupplierB": [
+        {"order_id": "ORD002", "promised_delivery_date": "2024-05-12", "actual_delivery_date": "2024-05-15", "quality_rating": 3.0, "items_defective": 5, "items_total": 200}, # 3 days late, some defects
+        {"order_id": "ORD005", "promised_delivery_date": "2024-05-20", "actual_delivery_date": "2024-05-20", "quality_rating": 4.0, "items_defective": 1, "items_total": 75},  # On time, minor defect
+    ],
+    "SupplierC": [
+        {"order_id": "ORD003", "promised_delivery_date": "2024-04-20", "actual_delivery_date": "2024-05-05", "quality_rating": 2.0, "items_defective": 15, "items_total": 120}, # 15 days late, significant defects
+    ]
+}
+
+def calculate_supplier_metrics(supplier_name):
+    """
+    Calculates average lead time deviation and average quality for a supplier.
+    Returns a dictionary with the metrics.
+    """
+    if supplier_name not in supplier_deliveries_db or not supplier_deliveries_db[supplier_name]:
+        return {"error": f"No delivery data found for supplier {supplier_name}."}
+
+    deliveries = supplier_deliveries_db[supplier_name]
+    total_lead_time_deviations = []
+    total_quality_ratings = []
+    total_defect_rates = []
+    
+    on_time_deliveries = 0
+
+    for delivery in deliveries:
+        try:
+            promised_date = datetime.datetime.strptime(delivery["promised_delivery_date"], "%Y-%m-%d").date()
+            actual_date = datetime.datetime.strptime(delivery["actual_delivery_date"], "%Y-%m-%d").date()
+            
+            lead_time_deviation = (actual_date - promised_date).days
+            total_lead_time_deviations.append(lead_time_deviation)
+            
+            if lead_time_deviation <= 0: # On time or early
+                on_time_deliveries += 1
+                
+            total_quality_ratings.append(delivery["quality_rating"])
+            
+            if delivery["items_total"] > 0:
+                defect_rate = (delivery["items_defective"] / delivery["items_total"]) * 100
+                total_defect_rates.append(defect_rate)
+            else:
+                total_defect_rates.append(0) # Avoid division by zero if no items
+
+        except ValueError:
+            print(f"Warning: Skipping delivery for {supplier_name} due to invalid date format: {delivery}")
+            continue
+        except KeyError as e:
+            print(f"Warning: Skipping delivery for {supplier_name} due to missing key '{e}': {delivery}")
+            continue
+
+
+    if not total_lead_time_deviations: # Handles cases where all deliveries had errors
+        return {"error": f"Could not process any delivery data for supplier {supplier_name}."}
+
+    avg_lead_time_deviation = sum(total_lead_time_deviations) / len(total_lead_time_deviations)
+    avg_quality_rating = sum(total_quality_ratings) / len(total_quality_ratings)
+    avg_defect_rate = sum(total_defect_rates) / len(total_defect_rates)
+    on_time_delivery_rate = (on_time_deliveries / len(deliveries)) * 100 if deliveries else 0
+
+
+    return {
+        "supplier": supplier_name,
+        "number_of_deliveries": len(deliveries),
+        "average_lead_time_deviation_days": round(avg_lead_time_deviation, 2), # Positive means late, negative means early
+        "on_time_delivery_rate_percent": round(on_time_delivery_rate, 2),
+        "average_quality_rating_out_of_5": round(avg_quality_rating, 2),
+        "average_defect_rate_percent": round(avg_defect_rate, 2)
+    }
+
+# Example Usage
+print("\n--- Supplier Performance Metrics Calculation ---")
+suppliers_to_evaluate = ["SupplierA", "SupplierB", "SupplierC", "SupplierD"] # SupplierD has no data
+
+for supplier in suppliers_to_evaluate:
+    metrics = calculate_supplier_metrics(supplier)
+    if "error" in metrics:
+        print(f"📊 Metrics for {supplier}: {metrics['error']}")
+    else:
+        print(f"📊 Metrics for {metrics['supplier']}:")
+        print(f"  🚚 Deliveries Tracked: {metrics['number_of_deliveries']}")
+        print(f"  ⏱️ Avg. Lead Time Deviation: {metrics['average_lead_time_deviation_days']} days")
+        print(f"  🎯 On-Time Delivery Rate: {metrics['on_time_delivery_rate_percent']}%")
+        print(f"  ⭐ Avg. Quality Rating: {metrics['average_quality_rating_out_of_5']}/5.0")
+        print(f"  📉 Avg. Defect Rate: {metrics['average_defect_rate_percent']}%")
+        
+# Example of adding new delivery data and re-calculating
+new_delivery_supplier_A = {
+    "order_id": "ORD006", 
+    "promised_delivery_date": "2025-05-25", 
+    "actual_delivery_date": "2025-05-25", 
+    "quality_rating": 4.8, 
+    "items_defective": 1, 
+    "items_total": 200
+}
+supplier_deliveries_db["SupplierA"].append(new_delivery_supplier_A)
+
+print("\n--- Recalculating for SupplierA after new delivery ---")
+metrics_A_updated = calculate_supplier_metrics("SupplierA")
+if "error" not in metrics_A_updated:
+    print(f"📊 Metrics for {metrics_A_updated['supplier']}:")
+    print(f"  🚚 Deliveries Tracked: {metrics_A_updated['number_of_deliveries']}")
+    print(f"  ⏱️ Avg. Lead Time Deviation: {metrics_A_updated['average_lead_time_deviation_days']} days")
+    print(f"  🎯 On-Time Delivery Rate: {metrics_A_updated['on_time_delivery_rate_percent']}%")
+    print(f"  ⭐ Avg. Quality Rating: {metrics_A_updated['average_quality_rating_out_of_5']}/5.0")
+    print(f"  📉 Avg. Defect Rate: {metrics_A_updated['average_defect_rate_percent']}%")
