@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+
+class DynamicReplanner:
+    def __init__(self, base_plan):
+        self.base_plan = base_plan
+        self.current_plan = base_plan.copy()
+        self.change_history = []
+        
+    def detect_changes(self, actuals, threshold=0.2):
+        """Monitor for significant demand shifts"""
+        merged = self.current_plan.merge(actuals, on=['date', 'product'], suffixes=('_plan', '_actual'))
+        merged['variance'] = (merged['quantity_actual'] - merged['quantity_plan']) / merged['quantity_plan']
+        significant_changes = merged[np.abs(merged['variance']) > threshold]
+        return significant_changes
+    
+    def replan(self, actuals, capacity):
+        """Adjust plan based on latest information"""
+        # Calculate adjustment factors
+        merged = self.detect_changes(actuals)
+        adjustment_factors = merged.groupby('product')['variance'].mean().reset_index()
+        
+        # Apply adjustments with capacity constraints
+        new_plan = self.current_plan.copy()
+        for _, row in adjustment_factors.iterrows():
+            adj = 1 + row['variance']
+            max_adj = capacity.loc[capacity['product'] == row['product'], 'max_adjustment'].values[0]
+            new_plan.loc[new_plan['product'] == row['product'], 'quantity'] *= min(adj, max_adj)
+        
+        self.change_history.append(self.current_plan)
+        self.current_plan = new_plan
+        return new_plan
+
+# Usage example
+base_plan = pd.read_csv('base_demand_plan.csv')
+replanner = DynamicReplanner(base_plan)
+actuals = pd.read_csv('latest_sales.csv')
+capacity = pd.read_csv('adjustment_limits.csv')
+new_plan = replanner.replan(actuals, capacity)
