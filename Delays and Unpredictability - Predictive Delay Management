@@ -1,0 +1,25 @@
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+class DelayPredictor:
+    def __init__(self):
+        self.model = LinearRegression()
+        
+    def train_model(self, historical_data):
+        """Train on historical delay data (features: [distance, border_crossings, weather_score])"""
+        X = np.array([d[0] for d in historical_data])
+        y = np.array([d[1] for d in historical_data])
+        self.model.fit(X, y)
+    
+    def predict_delay(self, distance, border_crossings, weather_score=1):
+        """Predict delay in hours (weather_score: 1=good, 0=bad)"""
+        return self.model.predict([[distance, border_crossings, weather_score]])[0]
+
+# Usage
+predictor = DelayPredictor()
+historical = [
+    [[500, 2, 1], 8.5],  # 500km, 2 borders, good weather → 8.5h delay
+    [[800, 3, 0], 15.2]
+]
+predictor.train_model(historical)
+print(f"Predicted delay: {predictor.predict_delay(600, 2):.1f} hours")
