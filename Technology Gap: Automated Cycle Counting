@@ -1,0 +1,32 @@
+import random
+import csv
+from datetime import datetime
+
+def automated_cycle_count(inventory_list, count_percentage=0.05):
+    """
+    Generates daily cycle count list
+    Args:
+        inventory_list: List of SKUs
+        count_percentage: Percentage of inventory to count daily
+    Returns:
+        CSV file with daily cycle count tasks
+    """
+    daily_count = random.sample(
+        inventory_list, 
+        k=max(1, int(len(inventory_list) * count_percentage))
+    
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f'cycle_count_{timestamp}.csv'
+    
+    with open(filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['SKU', 'Location', 'Count'])
+        for item in daily_count:
+            writer.writerow([item['sku'], item['location'], ''])
+    
+    return filename
+
+# Example usage:
+inventory = [{'sku': f'SKU{num:03}', 'location': f'A{num//10}{num%10}'} for num in range(100)]
+count_file = automated_cycle_count(inventory)
+print(f"Generated cycle count file: {count_file}")
