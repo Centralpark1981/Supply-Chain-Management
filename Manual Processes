@@ -1,0 +1,56 @@
+# Manual Process Automation: PO Generation
+import datetime
+
+def generate_po_number():
+    """Generates a unique PO number (simplified)."""
+    now = datetime.datetime.now()
+    return f"PO-{now.strftime('%Y%m%d%H%M%S')}-{hash(str(now))%1000:03}" # Added randomness
+
+def create_purchase_order(requester, item_details, supplier, total_amount):
+    """
+    Automates the creation of a basic Purchase Order.
+    Returns a dictionary representing the PO.
+    """
+    if not item_details or not supplier or total_amount <= 0:
+        return {"error": "Missing critical information for PO creation."}
+
+    po_number = generate_po_number()
+    po_date = datetime.date.today().isoformat()
+
+    purchase_order = {
+        "po_number": po_number,
+        "po_date": po_date,
+        "requester": requester,
+        "supplier": supplier,
+        "items": item_details, # Expects a list of dicts e.g. [{"item_id": "XYZ", "description": "...", "quantity": 2, "unit_price": 50}]
+        "total_amount": total_amount,
+        "status": "Pending Approval"
+    }
+    print(f"📄 Purchase Order '{po_number}' created for {supplier}.")
+    return purchase_order
+
+# Example Usage
+print("\n--- Automated PO Creation ---")
+request1_items = [
+    {"item_id": "ITEM001", "description": "Laptop Pro 15", "quantity": 1, "unit_price": 1200},
+    {"item_id": "ITEM002", "description": "Wireless Mouse", "quantity": 2, "unit_price": 25}
+]
+request1_total = sum(item["quantity"] * item["unit_price"] for item in request1_items)
+
+po1 = create_purchase_order(
+    requester="Alice Wonderland",
+    item_details=request1_items,
+    supplier="SupplierB",
+    total_amount=request1_total
+)
+if "error" not in po1:
+    print(f"PO Details: {po1}")
+
+po2 = create_purchase_order(
+    requester="Bob The Builder",
+    item_details=[], # Missing item details
+    supplier="SupplierC",
+    total_amount=0
+)
+if "error" in po2:
+    print(f"PO Creation Failed: {po2['error']}")
