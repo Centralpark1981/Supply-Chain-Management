@@ -1,0 +1,26 @@
+class CarrierOptimizer:
+    def __init__(self):
+        self.carriers = {
+            'UPS': {'rate': 0.30, 'service_level': 9, 'capacity': 1000},
+            'FedEx': {'rate': 0.35, 'service_level': 8, 'capacity': 1500},
+            'DHL': {'rate': 0.28, 'service_level': 7, 'capacity': 800}
+        }
+    
+    def select_carrier(self, shipment_size, prioritize='cost'):
+        """Select best carrier based on cost or service level"""
+        viable = [c for c in self.carriers.items() if c[1]['capacity'] >= shipment_size]
+        
+        if prioritize == 'cost':
+            return min(viable, key=lambda x: x[1]['rate'])
+        elif prioritize == 'service':
+            return max(viable, key=lambda x: x[1]['service_level'])
+        else:
+            # Hybrid scoring (60% cost, 40% service)
+            scored = [(k, (0.6*(1/v['rate']) + 0.4*v['service_level'])) 
+                     for k,v in viable]
+            return max(scored, key=lambda x: x[1])
+
+# Usage
+optimizer = CarrierOptimizer()
+best_carrier = optimizer.select_carrier(900, prioritize='hybrid')
+print(f"Best carrier: {best_carrier[0]} with score {best_carrier[1]:.2f}")
