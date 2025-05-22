@@ -1,0 +1,64 @@
+# Delayed PO Cycle Management
+import datetime
+
+# Simulated PO database (in a real system, this would be a database)
+purchase_orders_db = [
+    {"po_number": "PO-20240501100000-123", "creation_date": "2024-05-01", "status": "Approved", "last_update": "2024-05-03"},
+    {"po_number": "PO-20240510083000-456", "creation_date": "2024-05-10", "status": "Pending Approval", "last_update": "2024-05-10"},
+    {"po_number": "PO-20240415090000-789", "creation_date": "2024-04-15", "status": "Pending Approval", "last_update": "2024-04-16"},
+    {"po_number": "PO-20240518110000-012", "creation_date": "2024-05-18", "status": "Shipped", "last_update": "2024-05-20"},
+    {"po_number": "PO-20240320140000-345", "creation_date": "2024-03-20", "status": "Pending Payment", "last_update": "2024-05-15"}, # Delayed payment
+]
+
+def identify_delayed_pos(max_days_pending_approval=5, max_days_pending_action=10):
+    """
+    Identifies POs that are delayed based on their status and last update.
+    Returns a list of delayed POs.
+    """
+    today = datetime.date.today()
+    delayed_pos = []
+
+    for po in purchase_orders_db:
+        last_update_date = datetime.datetime.strptime(po["last_update"], "%Y-%m-%d").date()
+        days_since_last_update = (today - last_update_date).days
+
+        if po["status"] == "Pending Approval" and days_since_last_update > max_days_pending_approval:
+            po["delay_reason"] = f"Pending approval for {days_since_last_update} days (threshold: {max_days_pending_approval} days)."
+            delayed_pos.append(po)
+        elif po["status"] not in ["Shipped", "Delivered", "Cancelled", "Closed"] and days_since_last_update > max_days_pending_action:
+            # Generic delay for other actionable statuses
+            po["delay_reason"] = f"No update on status '{po['status']}' for {days_since_last_update} days (threshold: {max_days_pending_action} days)."
+            delayed_pos.append(po)
+            
+    return delayed_pos
+
+# Example Usage
+print("\n--- Delayed PO Cycle Identification ---")
+# Simulate today's date for consistent testing if needed, otherwise it uses current date
+# For testing, you might want to set a fixed 'today'
+# import datetime
+# today_override = datetime.date(2024, 5, 22) # Example: If running on May 22, 2024
+# def get_today(): return today_override # and modify identify_delayed_pos to use get_today()
+
+delayed_purchase_orders = identify_delayed_pos(max_days_pending_approval=3, max_days_pending_action=7)
+
+if delayed_purchase_orders:
+    print("🚨 Delayed Purchase Orders Found:")
+    for po in delayed_purchase_orders:
+        print(f"  - PO Number: {po['po_number']}, Status: {po['status']}, Last Update: {po['last_update']}, Reason: {po['delay_reason']}")
+else:
+    print("✅ No significant PO delays found based on current criteria.")
+
+# Example: Adding a new PO that will be flagged as delayed in approval
+purchase_orders_db.append(
+    {"po_number": "PO-20250515120000-999", "creation_date": "2025-05-15", "status": "Pending Approval", "last_update": "2025-05-15"}
+)
+print("\n--- Re-checking after adding a potentially delayed PO ---")
+delayed_purchase_orders_updated = identify_delayed_pos(max_days_pending_approval=3, max_days_pending_action=7)
+if delayed_purchase_orders_updated:
+    print("🚨 Delayed Purchase Orders Found:")
+    for po in delayed_purchase_orders_updated:
+        if po["po_number"] == "PO-20250515120000-999":
+            print(f"  - PO Number: {po['po_number']}, Status: {po['status']}, Last Update: {po['last_update']}, Reason: {po['delay_reason']}")
+else:
+    print("✅ No significant PO delays found based on current criteria.")
