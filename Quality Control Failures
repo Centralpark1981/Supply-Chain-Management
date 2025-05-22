@@ -1,0 +1,120 @@
+# Quality Control Failures Simulation
+import random
+
+class ProductUnit:
+    def __init__(self, unit_id):
+        self.id = unit_id
+        self.status = "in_progress" # in_progress, good, scrap, needs_rework, reworked_good
+        self.inspection_log = []
+        self.rework_attempts = 0
+
+INSPECTION_POINTS_CONFIG = [
+    {"name": "Post-Assembly Inspection", "defect_rate": 0.08, "reworkable_defect_rate": 0.6, "max_reworks": 1}, # 8% defect, 60% of those are reworkable
+    {"name": "Final Quality Check", "defect_rate": 0.03, "reworkable_defect_rate": 0.3, "max_reworks": 0}  # 3% defect, 30% of those reworkable (but not allowed here)
+]
+
+def inspect_item(product_unit, inspection_point_name, defect_rate, reworkable_defect_rate, max_reworks):
+    """Simulates an inspection, updating product status."""
+    if product_unit.status == "scrap": # Already scrapped
+        product_unit.inspection_log.append({"point": inspection_point_name, "result": "skipped_scrapped"})
+        return
+
+    is_defective = random.random() < defect_rate
+    log_entry = {"point": inspection_point_name, "result": "", "rework_possible": False}
+
+    if is_defective:
+        is_reworkable = random.random() < reworkable_defect_rate
+        if is_reworkable and product_unit.rework_attempts < max_reworks:
+            product_unit.status = "needs_rework"
+            log_entry["result"] = "defective_reworkable"
+            log_entry["rework_possible"] = True
+        else:
+            product_unit.status = "scrap"
+            log_entry["result"] = "defective_scrapped"
+    else:
+        # If it was 'needs_rework' and passed this inspection (simulating post-rework check)
+        if product_unit.status == "needs_rework":
+            product_unit.status = "reworked_good"
+            log_entry["result"] = "passed_after_rework"
+        else:
+            product_unit.status = "good" # Mark as provisionally good, may change in next inspection
+            log_entry["result"] = "passed"
+            
+    product_unit.inspection_log.append(log_entry)
+    print(f"  Unit {product_unit.id} at {inspection_point_name}: {log_entry['result']}")
+
+
+def attempt_rework(product_unit):
+    """Simulates an attempt to rework a product."""
+    if product_unit.status == "needs_rework":
+        product_unit.rework_attempts += 1
+        # Simulate rework success/failure if needed, here we assume it goes back for re-inspection
+        print(f"  Unit {product_unit.id}: Rework attempt #{product_unit.rework_attempts}. Sent for re-inspection.")
+        product_unit.status = "in_progress_post_rework" # Ready for re-inspection
+        return True
+    return False
+
+
+def simulate_quality_control(num_units, inspection_points_config):
+    """Simulates production and quality control for a batch of units."""
+    print(f"\n📉 Simulating Quality Control for {num_units} units...")
+    products = [ProductUnit(i+1) for i in range(num_units)]
+    
+    final_stats = {"good": 0, "scrap": 0, "reworked_good": 0, "still_needs_rework": 0}
+
+    for unit in products:
+        print(f"\nProcessing Unit {unit.id}:")
+        for i, point_config in enumerate(inspection_points_config):
+            # If unit was reworked, it might skip to the inspection point it failed at or a specific rework check point
+            # For simplicity, we assume it goes through subsequent inspections.
+            if unit.status == "scrap": break # Don't inspect further if already scrapped
+
+            # Simulate the process leading to this inspection point
+            unit.status = "in_progress" 
+            
+            inspect_item(unit, point_config["name"], 
+                         point_config["defect_rate"], 
+                         point_config["reworkable_defect_rate"],
+                         point_config["max_reworks"])
+
+            if unit.status == "needs_rework":
+                rework_successful_for_reinspection = attempt_rework(unit)
+                if rework_successful_for_reinspection:
+                    # Re-inspect at the same point after rework
+                    print(f"  Re-inspecting Unit {unit.id} at {point_config['name']} after rework...")
+                    inspect_item(unit, point_config["name"] + " (Post-Rework)", 
+                                 point_config["defect_rate"] / 2, # Assume rework improves chances
+                                 point_config["reworkable_defect_rate"],
+                                 0) # No more reworks at this sub-stage
+            
+            if unit.status == "scrap": break # Stop if scrapped after rework/re-inspection
+
+        # Final status count
+        if unit.status == "good":
+            final_stats["good"] += 1
+        elif unit.status == "reworked_good":
+            final_stats["reworked_good"] +=1
+        elif unit.status == "scrap":
+            final_stats["scrap"] += 1
+        elif unit.status == "needs_rework": # Should ideally not happen if max_reworks=0 at final stage
+            final_stats["still_needs_rework"] +=1
+            final_stats["scrap"] += 1 # Treat as scrap if still needs rework at the end
+
+    print("\n--- Quality Control Summary ---")
+    total_produced = len(products)
+    total_good_output = final_stats["good"] + final_stats["reworked_good"]
+    print(f"Total Units Processed: {total_produced}")
+    print(f"  Passed First Time (Good): {final_stats['good']}")
+    print(f"  Passed After Rework (Reworked Good): {final_stats['reworked_good']}")
+    print(f"  Total Good Output: {total_good_output} ({(total_good_output/total_produced)*100:.2f}%)")
+    print(f"  Scrapped: {final_stats['scrap']} ({(final_stats['scrap']/total_produced)*100:.2f}%)")
+    if final_stats["still_needs_rework"] > 0:
+        print(f"  ⚠️ Units ending as 'still_needs_rework' (counted as scrap): {final_stats['still_needs_rework']}")
+    
+    first_pass_yield = final_stats["good"] / total_produced if total_produced > 0 else 0
+    print(f"  First Pass Yield (FPY): {first_pass_yield*100:.2f}%")
+
+    return final_stats
+
+# Example Usage
+simulate_quality_control(100, INSPECTION_POINTS_CONFIG)
