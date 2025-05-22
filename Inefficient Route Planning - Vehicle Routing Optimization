@@ -1,0 +1,29 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def optimize_routing(points):
+    """Implement greedy route optimization algorithm"""
+    remaining = points.copy()
+    route = [remaining.pop(0)]  # Start from first point
+    
+    while remaining:
+        nearest = min(remaining, key=lambda x: np.linalg.norm(np.array(x)-np.array(route[-1])))
+        route.append(remaining.pop(remaining.index(nearest)))
+    
+    # Calculate distance
+    distance = sum(np.linalg.norm(np.array(route[i])-np.array(route[i-1])) 
+                   for i in range(1, len(route)))
+    
+    # Visualization
+    x, y = zip(*route)
+    plt.plot(x, y, 'o-')
+    plt.title(f'Optimized Route (Total Distance: {distance:.2f} km)')
+    plt.grid()
+    plt.show()
+    return route, distance
+
+# Example usage
+points = [(0,0), (2,3), (5,7), (7,3), (9,9)]
+optimized_route, total_distance = optimize_routing(points)
+print(f"Optimized route: {optimized_route}")
+print(f"Total distance: {total_distance:.2f} km")
