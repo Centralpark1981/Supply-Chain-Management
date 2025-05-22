@@ -1,0 +1,32 @@
+from collections import deque
+
+class TrainingScheduler:
+    def __init__(self):
+        self.training_queue = deque()
+        self.scheduled_sessions = []
+    
+    def add_employee(self, employee_id, priority=False):
+        """Add employee to training queue with optional priority"""
+        if priority:
+            self.training_queue.appendleft(employee_id)
+        else:
+            self.training_queue.append(employee_id)
+    
+    def schedule_training(self, session_date, max_capacity=5):
+        """Schedule next group of employees for training"""
+        participants = []
+        while len(participants) < max_capacity and self.training_queue:
+            participants.append(self.training_queue.popleft())
+        if participants:
+            self.scheduled_sessions.append({
+                'date': session_date,
+                'participants': participants
+            })
+        return participants
+
+# Example usage:
+scheduler = TrainingScheduler()
+scheduler.add_employee('E001')
+scheduler.add_employee('E002', priority=True)
+next_session = scheduler.schedule_training('2024-03-20')
+print("Scheduled Training Participants:", next_session)
