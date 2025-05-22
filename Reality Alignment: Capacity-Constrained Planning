@@ -1,0 +1,41 @@
+import pulp
+import pandas as pd
+
+def validate_capacity_constraints():
+    # Load datasets
+    demand_plan = pd.read_csv('demand_plan.csv')
+    production_capacity = pd.read_csv('capacity.csv')
+    supplier_capacity = pd.read_csv('suppliers.csv')
+
+    # Create optimization model
+    prob = pulp.LpProblem("Capacity_Planning", pulp.LpMinimize)
+    
+    # Decision variables
+    products = demand_plan['product'].unique()
+    production = pulp.LpVariable.dicts("Production", products, lowBound=0)
+    
+    # Objective: Minimize unmet demand
+    prob += pulp.lpSum([demand_plan.loc[demand_plan['product']==p, 'quantity'].values[0] - production[p] 
+                      for p in products])
+    
+    # Constraints
+    for p in products:
+        # Production capacity
+        prob += production[p] <= production_capacity.loc[production_capacity['product']==p, 'max_capacity'].values[0]
+        # Supplier constraints
+        prob += production[p] <= supplier_capacity.loc[supplier_capacity['product']==p, 'max_supply'].values[0]
+    
+    prob.solve()
+    
+    # Generate alerts for constraints
+    alerts = []
+    for p in products:
+        planned = demand_plan.loc[demand_plan['product']==p, 'quantity'].values[0]
+        actual = production[p].varValue
+        if actual < planned:
+            alerts.append(f"Capacity shortfall: {p} ({planned-actual} units)")
+    
+    return alerts
+
+capacity_alerts = validate_capacity_constraints()
+print("Capacity Constraints:", capacity_alerts)
