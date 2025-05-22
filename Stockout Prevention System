@@ -1,0 +1,35 @@
+import numpy as np
+
+def stockout_risk_analysis(current_stock, lead_time_days, sales_history, service_level=0.95):
+    """
+    Predicts stockout risk using normal distribution model
+    Args:
+        current_stock: Current inventory quantity
+        lead_time_days: Supplier lead time in days
+        sales_history: List of daily sales quantities
+        service_level: Desired service level (z-score)
+    Returns:
+        Dictionary with risk analysis
+    """
+    avg_demand = np.mean(sales_history)
+    std_demand = np.std(sales_history)
+    
+    z_score = np.abs(np.percentile(np.random.randn(10000), 100*service_level))
+    safety_stock = z_score * std_demand * np.sqrt(lead_time_days)
+    
+    demand_during_lead_time = avg_demand * lead_time_days
+    reorder_point = demand_during_lead_time + safety_stock
+    
+    return {
+        'current_stock': current_stock,
+        'reorder_point': round(reorder_point, 2),
+        'stockout_risk': 'High' if current_stock < reorder_point else 'Low',
+        'suggested_order_qty': max(0, round(reorder_point - current_stock))
+    }
+
+# Example usage:
+print(stockout_risk_analysis(
+    current_stock=150,
+    lead_time_days=7,
+    sales_history=[20, 18, 22, 25, 19, 23, 21]
+))
