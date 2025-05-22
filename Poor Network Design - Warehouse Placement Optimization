@@ -1,0 +1,22 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def optimize_warehouse_placement(demand_points):
+    """Calculate optimal warehouse position using demand point centroid"""
+    x = [p[0] for p in demand_points]
+    y = [p[1] for p in demand_points]
+    warehouse = (np.mean(x), np.mean(y))
+    
+    # Visualization
+    plt.scatter(x, y, label='Demand Points')
+    plt.scatter(*warehouse, c='red', s=100, label='Optimal Warehouse')
+    plt.title('Warehouse Placement Optimization')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    return warehouse
+
+# Example usage
+demand_points = [(2,5), (3,8), (10,12), (15,3), (8,6), (4,9)]
+optimal_warehouse = optimize_warehouse_placement(demand_points)
+print(f"Optimal warehouse position: {optimal_warehouse}")
