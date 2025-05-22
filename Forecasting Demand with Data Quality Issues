@@ -1,0 +1,32 @@
+import pandas as pd
+from sklearn.impute import KNNImputer
+from statsmodels.tsa.arima.model import ARIMA
+import numpy as np
+
+# Load historical data
+data = pd.read_csv('historical_data.csv', parse_dates=['date'])
+
+# Handle missing values
+def clean_data(df):
+    # Fill missing dates
+    df = df.set_index('date').resample('D').asfreq()
+    # Impute missing values using KNN
+    imputer = KNNImputer(n_neighbors=5)
+    df['demand'] = imputer.fit_transform(df[['demand']])
+    # Remove outliers using IQR
+    Q1 = df['demand'].quantile(0.25)
+    Q3 = df['demand'].quantile(0.75)
+    df = df[(df['demand'] > Q1 - 1.5*(Q3-Q1)) & (df['demand'] < Q3 + 1.5*(Q3-Q1))]
+    return df.reset_index()
+
+cleaned_data = clean_data(data)
+
+# Build forecasting model
+def forecast_demand(data):
+    model = ARIMA(data['demand'], order=(7,1,0))  # Weekly seasonality
+    results = model.fit()
+    forecast = results.get_forecast(steps=30)
+    return forecast.predicted_mean
+
+next_month_forecast = forecast_demand(cleaned_data)
+print(f"Next 30 days forecast: {next_month_forecast}")
