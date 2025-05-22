@@ -1,0 +1,25 @@
+import numpy as np
+
+class CapacityOptimizer:
+    def __init__(self, base_rate=100, base_capacity=1000):
+        self.base_rate = base_rate
+        self.base_capacity = base_capacity
+        
+    def dynamic_pricing(self, current_demand, available_capacity):
+        """Adjust rates based on supply-demand balance"""
+        utilization = current_demand / available_capacity
+        surge_multiplier = 1 + np.log(utilization + 1)  # Logarithmic surge pricing
+        return round(self.base_rate * surge_multiplier, 2)
+    
+    def recommend_capacity(self, historical_demand):
+        """Suggest capacity adjustments using moving average"""
+        avg_demand = np.mean(historical_demand[-30:])  # 30-day moving average
+        return {
+            'recommended_capacity': avg_demand * 1.2,
+            'lease_additional': max(0, avg_demand * 1.2 - self.base_capacity)
+        }
+
+# Usage
+optimizer = CapacityOptimizer()
+print(f"Dynamic Price: ${optimizer.dynamic_pricing(950, 1000)}")
+print(f"Capacity Recommendations: {optimizer.recommend_capacity([800, 900, 950])}")
