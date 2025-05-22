@@ -1,0 +1,24 @@
+def optimize_loads(items, max_capacity):
+    """Bin packing algorithm for load optimization"""
+    items.sort(reverse=True)
+    loads = []
+    
+    for item in items:
+        placed = False
+        for load in loads:
+            if sum(load) + item <= max_capacity:
+                load.append(item)
+                placed = True
+                break
+        if not placed:
+            loads.append([item])
+    
+    utilization = sum(sum(load) for load in loads)/(len(loads)*max_capacity)
+    return loads, utilization
+
+# Usage
+items = [45, 32, 28, 25, 20, 18, 15, 12, 10, 8]
+max_pallet = 60
+optimized_loads, utilization = optimize_loads(items, max_pallet)
+print(f"Optimized loads: {optimized_loads}")
+print(f"Utilization rate: {utilization*100:.1f}%")
