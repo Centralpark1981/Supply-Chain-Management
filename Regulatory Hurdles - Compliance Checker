@@ -1,0 +1,25 @@
+from datetime import timedelta
+
+class RegulatoryCompliance:
+    def __init__(self):
+        self.rules = {
+            'max_weight': 25000,  # kg
+            'driver_hours_limit': timedelta(hours=14),
+            'required_docs': ['bill_of_lading', 'commercial_invoice']
+        }
+    
+    def check_shipment(self, weight, docs):
+        violations = []
+        if weight > self.rules['max_weight']:
+            violations.append(f"Overweight: {weight}kg")
+        if not all(d in docs for d in self.rules['required_docs']):
+            violations.append("Missing documentation")
+        return violations
+    
+    def driver_hours_compliance(self, driving_time):
+        return driving_time <= self.rules['driver_hours_limit']
+
+# Usage
+compliance = RegulatoryCompliance()
+print("Violations:", compliance.check_shipment(26000, ['bill_of_lading']))
+print("Driver compliant:", compliance.driver_hours_compliance(timedelta(hours=13)))
