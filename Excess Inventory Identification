@@ -1,0 +1,27 @@
+import pandas as pd
+
+def identify_excess_inventory(inventory_df, threshold_days=90):
+    """
+    Identifies SKUs with excess inventory based on days of supply
+    Args:
+        inventory_df: DataFrame with columns ['SKU', 'Quantity', 'Avg_Daily_Sales']
+        threshold_days: Days of supply threshold for flagging
+    Returns:
+        DataFrame with excess inventory recommendations
+    """
+    df = inventory_df.copy()
+    df['Days_of_Supply'] = df['Quantity'] / df['Avg_Daily_Sales']
+    df['Excess_Flag'] = df['Days_of_Supply'] > threshold_days
+    df['Suggested_Action'] = df['Excess_Flag'].apply(
+        lambda x: 'Liquidate/Discount' if x else 'OK'
+    )
+    return df[df['Excess_Flag']].sort_values('Days_of_Supply', ascending=False)
+
+# Example usage:
+inventory_data = {
+    'SKU': ['A001', 'B002', 'C003'],
+    'Quantity': [1500, 800, 300],
+    'Avg_Daily_Sales': [5, 20, 2]
+}
+df = pd.DataFrame(inventory_data)
+print(identify_excess_inventory(df))
