@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+
+class SupplierRiskAssessor:
+    def __init__(self):
+        self.risk_factors = {
+            'financial_stability': 0.3,
+            'geopolitical_risk': 0.25,
+            'single_source_risk': 0.25,
+            'lead_time_variability': 0.2
+        }
+    
+    def calculate_risk(self, suppliers_df):
+        # Normalize risk factors
+        scaler = MinMaxScaler()
+        scaled_data = scaler.fit_transform(suppliers_df[['financial_score', 'country_risk', 
+                                                       'order_share', 'lead_time_std']])
+        
+        # Calculate composite risk score
+        suppliers_df['risk_score'] = np.dot(scaled_data, list(self.risk_factors.values()))
+        
+        # Identify high-risk suppliers
+        suppliers_df['risk_category'] = pd.qcut(suppliers_df['risk_score'], 3, 
+                                              labels=['low', 'medium', 'high'])
+        return suppliers_df
+
+# Usage
+supplier_data = pd.DataFrame({
+    'supplier': ['A', 'B', 'C'],
+    'financial_score': [85, 45, 70],
+    'country_risk': [2, 7, 4],
+    'order_share': [0.6, 0.3, 0.1],
+    'lead_time_std': [2, 5, 3]
+})
+
+assessor = SupplierRiskAssessor()
+risk_assessment = assessor.calculate_risk(supplier_data)
+print(risk_assessment[['supplier', 'risk_score', 'risk_category']])
