@@ -1,0 +1,116 @@
+# Underutilization of Capacity Simulation
+import random
+
+class WorkCenter:
+    def __init__(self, name, available_hours_per_day, setup_time_hours_new_batch=0.5, units_per_hour_capacity=10):
+        self.name = name
+        self.available_hours_per_day = available_hours_per_day
+        self.setup_time_new_batch = setup_time_hours_new_batch
+        self.units_per_hour_capacity = units_per_hour_capacity # Theoretical max output rate
+        self.total_planned_hours = 0
+        self.total_actual_operating_hours = 0
+        self.total_setup_hours = 0
+        self.total_idle_hours_no_demand = 0
+        self.total_idle_hours_other = 0 # e.g. waiting for materials, minor stoppages not counted as downtime
+        self.units_produced = 0
+
+    def simulate_day(self, day_num, demand_units_today, unplanned_downtime_hours=0):
+        """Simulates a day of operation for the work center."""
+        print(f"\n--- Day {day_num}: {self.name} ---")
+        print(f"  Demand: {demand_units_today} units. Available Hours: {self.available_hours_per_day}h. Downtime: {unplanned_downtime_hours}h")
+
+        effective_available_hours = self.available_hours_per_day - unplanned_downtime_hours
+        self.total_planned_hours += self.available_hours_per_day # Planned hours are based on availability
+
+        if demand_units_today == 0:
+            self.total_idle_hours_no_demand += effective_available_hours
+            print(f"  No demand. {self.name} idle for {effective_available_hours:.2f} hours.")
+            return
+
+        # Calculate required production hours for demand
+        required_pure_production_hours = demand_units_today / self.units_per_hour_capacity
+        
+        # Assume one setup if there's any demand
+        current_day_setup_hours = self.setup_time_new_batch if demand_units_today > 0 else 0
+        self.total_setup_hours += current_day_setup_hours
+        
+        required_total_op_hours = required_pure_production_hours + current_day_setup_hours
+
+        if required_total_op_hours <= effective_available_hours:
+            # Can meet demand
+            actual_op_hours_today = required_total_op_hours
+            units_produced_today = demand_units_today
+            idle_hours_today = effective_available_hours - actual_op_hours_today
+            self.total_idle_hours_other += idle_hours_today # Idle because demand met within available time
+            print(f"  Demand met. Operating: {actual_op_hours_today:.2f}h (Setup: {current_day_setup_hours:.1f}h, Prod: {required_pure_production_hours:.1f}h). Idle: {idle_hours_today:.2f}h.")
+        else:
+            # Cannot meet full demand within effective hours
+            actual_op_hours_today = effective_available_hours
+            # Production is limited by available time after setup
+            producible_after_setup_hours = max(0, effective_available_hours - current_day_setup_hours)
+            units_produced_today = producible_after_setup_hours * self.units_per_hour_capacity
+            self.total_idle_hours_other += 0 # Fully utilized or constrained
+            print(f"  Demand ({demand_units_today}) EXCEEDS capacity ({units_produced_today:.0f} units producible). Operating max: {actual_op_hours_today:.2f}h. Shortfall: {demand_units_today - units_produced_today:.0f} units.")
+        
+        self.total_actual_operating_hours += actual_op_hours_today
+        self.units_produced += units_produced_today
+
+    def get_utilization_summary(self):
+        print(f"\n--- Utilization Summary for {self.name} ---")
+        if self.total_planned_hours == 0:
+            print("  No simulation days recorded.")
+            return
+
+        # Overall Equipment Effectiveness (OEE) components (simplified)
+        # Availability = (Planned Time - Downtime - Setup Time - Other Idle) / Planned Time
+        # Performance = Actual Operating Hours (pure prod) / (Planned Time - Downtime - Setup - Other Idle)  OR  (Units Produced / Max Possible Units)
+        # Quality = (Good Units / Total Units) - Assuming all units are good for this sim.
+
+        # Simple Utilization (Operating Time / Planned Time)
+        overall_utilization = (self.total_actual_operating_hours / self.total_planned_hours) * 100 if self.total_planned_hours > 0 else 0
+        
+        # Capacity Utilization (Units Produced / Max Theoretical Units if running full time)
+        max_theoretical_units = (self.total_planned_hours - self.total_setup_hours) * self.units_per_hour_capacity # Simplified
+        capacity_utilization_units = (self.units_produced / max_theoretical_units) * 100 if max_theoretical_units > 0 else 0
+
+        print(f"  Total Days Simulated: {self.total_planned_hours / self.available_hours_per_day:.0f}")
+        print(f"  Total Planned Hours: {self.total_planned_hours:.2f} h")
+        print(f"  Total Actual Operating Hours (incl. setup): {self.total_actual_operating_hours:.2f} h")
+        print(f"  Total Setup Hours: {self.total_setup_hours:.2f} h")
+        print(f"  Total Idle (No Demand): {self.total_idle_hours_no_demand:.2f} h")
+        print(f"  Total Idle (Other - e.g. capacity > demand): {self.total_idle_hours_other:.2f} h")
+        print(f"  Total Units Produced: {self.units_produced:.0f}")
+        
+        print(f"  📊 Overall Utilization (Operating/Planned): {overall_utilization:.2f}%")
+        print(f"  🏭 Capacity Utilization (Units/Theoretical Max Units): {capacity_utilization_units:.2f}%")
+
+        if overall_utilization < 70:
+            print("  ⚠️ Low overall utilization. Investigate reasons for idle time or low demand fulfillment.")
+        elif overall_utilization < 85:
+            print("  🆗 Moderate utilization. Potential for improvement.")
+        else:
+            print("  ✅ Good utilization.")
+
+# --- Simulation ---
+# Demand for 5 days (can simulate shifts)
+daily_demand = [100, 120, 50, 0, 90] # Units
+daily_downtime = [0, 1, 0.5, 0, 0.2] # Hours
+
+cnc_machine = WorkCenter(name="CNC Machine Alpha", available_hours_per_day=8, setup_time_hours_new_batch=0.5, units_per_hour_capacity=15)
+assembly_line = WorkCenter(name="Assembly Line Beta", available_hours_per_day=16, setup_time_hours_new_batch=1, units_per_hour_capacity=25) # 2 shifts
+
+
+print("\n--- Underutilization of Capacity Simulation ---")
+for day in range(len(daily_demand)):
+    # Simulate for CNC Machine
+    cnc_machine.simulate_day(day + 1, daily_demand[day], unplanned_downtime_hours=daily_downtime[day])
+    
+    # Simulate for Assembly Line (e.g., demand might be different or based on CNC output)
+    # For simplicity, using a scaled demand for assembly.
+    assembly_demand_today = int(daily_demand[day] * 0.8) if daily_demand[day] > 0 else 0
+    assembly_downtime_today = random.uniform(0,1) # Random downtime for assembly
+    assembly_line.simulate_day(day + 1, assembly_demand_today, unplanned_downtime_hours=assembly_downtime_today)
+
+
+cnc_machine.get_utilization_summary()
+assembly_line.get_utilization_summary()
