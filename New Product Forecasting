@@ -1,0 +1,28 @@
+from prophet import Prophet
+import pandas as pd
+
+def forecast_new_products():
+    data = pd.read_csv('sales_data.csv')
+    
+    # Feature engineering for market changes
+    data['new_product_launch'] = data['new_product_indicator'].apply(lambda x: 1 if x else 0)
+    data['channel_shift'] = data['online_sales_ratio'].rolling(14).mean()
+    
+    # Build Prophet model with external regressors
+    model = Prophet(yearly_seasonality=True)
+    model.add_regressor('new_product_launch')
+    model.add_regressor('channel_shift')
+    model.add_regressor('marketing_spend')
+    
+    model.fit(data.rename(columns={'date':'ds', 'demand':'y'}))
+    
+    # Future scenario with planned new products
+    future = model.make_future_dataframe(periods=90)
+    future = future.merge(data[['ds', 'marketing_spend']], on='ds', how='left')
+    future['new_product_launch'] = 0  # Set future product launches
+    future['channel_shift'] = data['channel_shift'].iloc[-1]  # Maintain current trend
+    
+    forecast = model.predict(future)
+    return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+new_product_forecast = forecast_new_products()
