@@ -1,0 +1,129 @@
+# Poor Lead Time Visibility: Shipment Tracking
+import datetime
+import random
+
+# --- Simulated Data & States ---
+shipments_database = {} # shipment_id: data
+
+# Typical international shipping stages
+SHIPMENT_STAGES = [
+    "Order Confirmed",
+    "Goods Ready for Pickup",
+    "Goods Picked Up",
+    "Export Customs Processing",
+    "Departed Origin Port/Airport",
+    "In Transit - Leg 1", # Could be multiple transit legs
+    "Arrived Transshipment Hub",
+    "Departed Transshipment Hub",
+    "In Transit - Final Leg",
+    "Arrived Destination Port/Airport",
+    "Import Customs Clearance",
+    "Awaiting Last-Mile Delivery",
+    "Out for Delivery",
+    "Delivered",
+    "Exception/Delayed" # General delay status
+]
+
+def create_shipment(shipment_id, origin, destination, planned_departure_str, planned_arrival_str, current_value):
+    """Initializes a new shipment."""
+    try:
+        planned_departure = datetime.datetime.strptime(planned_departure_str, "%Y-%m-%d %H:%M")
+        planned_arrival = datetime.datetime.strptime(planned_arrival_str, "%Y-%m-%d %H:%M")
+    except ValueError:
+        print(f"Error: Invalid date format for shipment {shipment_id}. Use YYYY-MM-DD HH:MM")
+        return None
+
+    shipments_database[shipment_id] = {
+        "origin": origin,
+        "destination": destination,
+        "planned_departure": planned_departure,
+        "planned_arrival": planned_arrival,
+        "estimated_arrival": planned_arrival, # Initially same as planned
+        "current_status": SHIPMENT_STAGES[0], # Order Confirmed
+        "current_location": origin,
+        "last_update_time": datetime.datetime.now(),
+        "value": current_value,
+        "history": [{"status": SHIPMENT_STAGES[0], "location": origin, "timestamp": datetime.datetime.now()}]
+    }
+    print(f"🚚 Shipment {shipment_id} created. Planned EPD: {planned_departure_str}, EPA: {planned_arrival_str}")
+    return shipments_database[shipment_id]
+
+def update_shipment_status(shipment_id, new_status, new_location, event_time_str=None, delay_hours=0):
+    """Updates the status of a shipment and recalculates ETA if delayed."""
+    if shipment_id not in shipments_database:
+        print(f"Error: Shipment {shipment_id} not found.")
+        return None
+
+    shipment = shipments_database[shipment_id]
+    
+    if new_status not in SHIPMENT_STAGES:
+        print(f"Warning: Invalid status '{new_status}'. Using 'Exception/Delayed'.")
+        new_status = "Exception/Delayed"
+
+    event_time = datetime.datetime.now() if not event_time_str else datetime.datetime.strptime(event_time_str, "%Y-%m-%d %H:%M")
+    
+    shipment["current_status"] = new_status
+    shipment["current_location"] = new_location
+    shipment["last_update_time"] = event_time
+    shipment["history"].append({"status": new_status, "location": new_location, "timestamp": event_time})
+
+    if delay_hours > 0:
+        shipment["estimated_arrival"] += datetime.timedelta(hours=delay_hours)
+        shipment["current_status"] = "Exception/Delayed" # Mark as delayed if explicit delay_hours
+        shipment["history"].append({"status": "Delay Alert", "location": new_location, "timestamp": event_time, "delay_impact_hrs": delay_hours})
+
+
+    print(f"  Update for {shipment_id}: Status -> {new_status} at {new_location}. New ETA: {shipment['estimated_arrival'].strftime('%Y-%m-%d %H:%M')}")
+    return shipment
+
+def get_shipment_details(shipment_id):
+    """Retrieves and displays current shipment details."""
+    if shipment_id not in shipments_database:
+        return f"Error: Shipment {shipment_id} not found."
+    
+    shipment = shipments_database[shipment_id]
+    details = (
+        f"\n📊 Status for Shipment ID: {shipment_id}\n"
+        f"  Origin: {shipment['origin']}, Destination: {shipment['destination']}\n"
+        f"  Planned Departure: {shipment['planned_departure'].strftime('%Y-%m-%d %H:%M')}\n"
+        f"  Original Planned Arrival: {shipment['planned_arrival'].strftime('%Y-%m-%d %H:%M')}\n"
+        f"  Current Status: {shipment['current_status']}\n"
+        f"  Current Location: {shipment['current_location']}\n"
+        f"  Estimated Arrival: {shipment['estimated_arrival'].strftime('%Y-%m-%d %H:%M')}\n"
+        f"  Last Update: {shipment['last_update_time'].strftime('%Y-%m-%d %H:%M:%S')}\n"
+    )
+    
+    if shipment["estimated_arrival"] > shipment["planned_arrival"]:
+        delay = shipment["estimated_arrival"] - shipment["planned_arrival"]
+        details += f"  ⚠️ DELAYED: Current ETA is {delay} later than planned.\n"
+    elif shipment["current_status"] == "Exception/Delayed":
+         details += f"  ⚠️ DELAYED: Shipment has an exception status.\n"
+            
+    # Simple check for stale updates
+    if (datetime.datetime.now() - shipment["last_update_time"]).days > 2 and shipment["current_status"] not in ["Delivered", "Exception/Delayed"]:
+        details += "  ⚠️ WARNING: No update for more than 2 days.\n"
+        
+    print(details)
+    print("  History:")
+    for entry in shipment["history"][-5:]: # Display last 5 history entries
+        print(f"    - {entry['timestamp'].strftime('%Y-%m-%d %H:%M')} : {entry['status']} @ {entry['location']}" + (f" (Delay: {entry['delay_impact_hrs']}hrs)" if "delay_impact_hrs" in entry else ""))
+    return shipment
+
+# Example Usage
+print("\n--- Poor Lead Time Visibility Simulation ---")
+create_shipment("SHP201", "Shanghai, CN", "Los Angeles, USA", "2025-06-01 14:00", "2025-06-15 10:00", 50000)
+update_shipment_status("SHP201", SHIPMENT_STAGES[2], "Shanghai Port", "2025-06-01 18:00") # Goods Picked Up
+update_shipment_status("SHP201", SHIPMENT_STAGES[4], "East China Sea", "2025-06-02 22:00") # Departed Origin
+update_shipment_status("SHP201", "Weather Delay", "Near Japan", "2025-06-05 08:00", delay_hours=48) # Weather Delay
+update_shipment_status("SHP201", SHIPMENT_STAGES[8], "Pacific Ocean", "2025-06-10 12:00") # In Transit - Final Leg
+get_shipment_details("SHP201")
+
+create_shipment("SHP202", "Frankfurt, DE", "New York, USA", "2025-06-03 10:00", "2025-06-05 18:00", 75000) # Air freight
+update_shipment_status("SHP202", SHIPMENT_STAGES[3], "Frankfurt Airport", "2025-06-03 11:00") # Export Customs
+update_shipment_status("SHP202", SHIPMENT_STAGES[4], "Frankfurt Airport", "2025-06-03 15:00") # Departed
+# No more updates for SHP202 for a while, to trigger stale warning later if we were to check on e.g. 2025-06-06
+# For immediate testing of stale:
+# shipments_database["SHP202"]["last_update_time"] = datetime.datetime.now() - datetime.timedelta(days=3)
+get_shipment_details("SHP202")
+# shipments_database["SHP202"]["last_update_time"] = datetime.datetime.now() - datetime.timedelta(days=3) # test stale
+# get_shipment_details("SHP202") # Re-check to see stale warning
