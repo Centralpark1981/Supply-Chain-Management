@@ -1,0 +1,30 @@
+import pandas as pd
+from functools import reduce
+
+class DemandPlanningHub:
+    def __init__(self):
+        self.data_sources = {}
+        
+    def add_source(self, name, data):
+        """Add data from different departments"""
+        self.data_sources[name] = data
+        
+    def get_combined_view(self):
+        """Merge all data sources on date and product"""
+        dfs = [df.set_index(['date', 'product']) for df in self.data_sources.values()]
+        combined = reduce(lambda left,right: pd.merge(left, right, left_index=True, right_index=True), dfs)
+        return combined.reset_index()
+    
+    def calculate_metrics(self):
+        """Create cross-functional KPIs"""
+        combined = self.get_combined_view()
+        combined['capacity_utilization'] = combined['demand_plan'] / combined['production_capacity']
+        combined['supplier_risk'] = (combined['raw_material_needs'] - combined['supplier_commitments']).clip(lower=0)
+        return combined
+
+# Usage example
+hub = DemandPlanningHub()
+hub.add_source('sales', pd.read_csv('sales_forecast.csv'))
+hub.add_source('production', pd.read_csv('capacity_plan.csv'))
+hub.add_source('procurement', pd.read_csv('supplier_commitments.csv'))
+combined_view = hub.calculate_metrics()
