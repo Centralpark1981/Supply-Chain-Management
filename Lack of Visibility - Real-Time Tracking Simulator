@@ -1,0 +1,35 @@
+import time
+from threading import Thread
+from datetime import datetime, timedelta
+
+class ShipmentTracker:
+    def __init__(self, origin, destination, avg_speed=50):
+        self.current_location = origin
+        self.eta = self.calculate_eta(origin, destination, avg_speed)
+        self.running = True
+        
+    def calculate_eta(self, origin, destination, speed):
+        distance = abs(destination - origin)  # Simplified distance calculation
+        return datetime.now() + timedelta(hours=distance/speed)
+    
+    def update_position(self):
+        """Simulate position updates"""
+        while self.running:
+            self.current_location += 1  # Simulate movement
+            time.sleep(5)  # Update every 5 seconds
+            
+    def get_status(self):
+        return {
+            'current_location': self.current_location,
+            'eta': self.eta.strftime("%Y-%m-%d %H:%M:%S"),
+            'progress': f"{(self.current_location/self.eta.timestamp())*100:.1f}%"
+        }
+
+# Usage
+tracker = ShipmentTracker(0, 100)
+Thread(target=tracker.update_position).start()
+
+# Simulate tracking updates
+time.sleep(2)
+print(f"Current status: {tracker.get_status()}")
+tracker.running = False
