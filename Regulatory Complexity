@@ -1,0 +1,121 @@
+# Regulatory Complexity: Trade Policies & Tariffs
+import datetime
+
+# --- Simulated Data ---
+# (In a real system, this would be a comprehensive, up-to-date database)
+trade_policies = {
+    # (origin_country, destination_country, product_category): policy_status
+    ("USA", "CountryX", "Electronics"): {"status": "allowed", "notes": "Standard inspection"},
+    ("China", "CountryX", "Textiles"): {"status": "allowed", "notes": "Quota in effect"},
+    ("USA", "CountryY", "Agricultural"): {"status": "restricted", "notes": "Requires special phytosanitary certificate"},
+    ("Any", "CountryZ", "Weaponry"): {"status": "embargoed", "notes": "Full embargo"},
+    ("China", "CountryA", "Machinery"): {"status": "allowed", "notes": "Standard"},
+}
+
+# Tariffs: (destination_country, product_category, origin_country_group): tariff_rate_percentage
+# Origin country groups simplify general tariff rules (e.g., MFN, FTA, General)
+country_groups = {
+    "USA": "NAFTA_LIKE",
+    "Canada": "NAFTA_LIKE",
+    "Mexico": "NAFTA_LIKE",
+    "Germany": "EU_MEMBER",
+    "France": "EU_MEMBER",
+    "China": "GENERAL_RATE",
+    "India": "GENERAL_RATE",
+}
+
+tariffs_db = {
+    # (destination_country, product_category, origin_group): rate
+    ("CountryX", "Electronics", "NAFTA_LIKE"): 0.05,  # 5%
+    ("CountryX", "Electronics", "GENERAL_RATE"): 0.10, # 10%
+    ("CountryX", "Textiles", "GENERAL_RATE"): 0.15,   # 15%
+    ("CountryY", "Agricultural", "NAFTA_LIKE"): 0.07, # 7% (even if restricted, tariff might apply if allowed)
+    ("CountryA", "Machinery", "GENERAL_RATE"): 0.08,
+    ("CountryA", "Machinery", "EU_MEMBER"): 0.03, # Preferential rate for EU
+}
+default_tariff_rate = 0.12 # Default if no specific rule applies but trade is allowed
+
+def get_trade_policy(origin_country, destination_country, product_category):
+    """Retrieves trade policy based on origin, destination, and product."""
+    policy = trade_policies.get((origin_country, destination_country, product_category))
+    if not policy:
+        policy = trade_policies.get(("Any", destination_country, product_category)) # Check for general product embargo
+    if not policy:
+        policy = {"status": "allowed", "notes": "Default: Standard processing, verify specifics."} # Default assumption
+    return policy
+
+def calculate_tariff(destination_country, product_category, origin_country, product_value):
+    """Calculates tariff based on destination, product, origin, and value."""
+    origin_group = country_groups.get(origin_country, "GENERAL_RATE") # Default to general if country not in specific group
+
+    tariff_rate = tariffs_db.get((destination_country, product_category, origin_group))
+    
+    if tariff_rate is None: # Try with a broader origin group if specific not found
+         tariff_rate = tariffs_db.get((destination_country, product_category, "GENERAL_RATE"))
+
+    if tariff_rate is None:
+        tariff_rate = default_tariff_rate # Fallback to default tariff
+
+    tariff_amount = product_value * tariff_rate
+    return tariff_amount, tariff_rate
+
+def check_trade_regulations_and_tariffs(origin_country, destination_country, product_category, product_value):
+    """
+    Checks trade regulations and calculates potential tariffs.
+    """
+    print(f"\n🔍 Checking: {product_category} from {origin_country} to {destination_country} (Value: ${product_value:,.2f})")
+    
+    policy = get_trade_policy(origin_country, destination_country, product_category)
+    policy_status = policy["status"]
+    policy_notes = policy["notes"]
+
+    if policy_status == "embargoed":
+        return {
+            "status": "Embargoed",
+            "policy_notes": policy_notes,
+            "tariff_amount": 0,
+            "tariff_rate": 0,
+            "advice": "Trade is prohibited."
+        }
+    
+    if policy_status == "restricted":
+        advice_msg = f"Trade is restricted. Action required: {policy_notes}. Tariff will apply if cleared."
+    else: # Allowed
+        advice_msg = f"Trade is allowed. Notes: {policy_notes}."
+
+    tariff_amount, tariff_rate = calculate_tariff(destination_country, product_category, origin_country, product_value)
+
+    return {
+        "status": policy_status.capitalize(),
+        "policy_notes": policy_notes,
+        "tariff_amount": tariff_amount,
+        "tariff_rate": tariff_rate,
+        "advice": advice_msg,
+        "total_landed_cost_estimate": product_value + tariff_amount
+    }
+
+# Example Usage
+print("--- Regulatory Complexity & Tariff Simulation ---")
+result1 = check_trade_regulations_and_tariffs("USA", "CountryX", "Electronics", 10000)
+print(f"  Outcome: {result1['status']}. Tariff: ${result1['tariff_amount']:.2f} ({result1['tariff_rate']*100:.1f}%). {result1['advice']}")
+print(f"  Estimated Landed Cost: ${result1.get('total_landed_cost_estimate', 'N/A'):,.2f}")
+
+
+result2 = check_trade_regulations_and_tariffs("USA", "CountryY", "Agricultural", 5000)
+print(f"  Outcome: {result2['status']}. Tariff: ${result2['tariff_amount']:.2f} ({result2['tariff_rate']*100:.1f}%). {result2['advice']}")
+print(f"  Estimated Landed Cost: ${result2.get('total_landed_cost_estimate', 'N/A'):,.2f}")
+
+result3 = check_trade_regulations_and_tariffs("SomeCountry", "CountryZ", "Weaponry", 100000)
+print(f"  Outcome: {result3['status']}. {result3['advice']}")
+
+result4 = check_trade_regulations_and_tariffs("China", "CountryA", "Machinery", 25000)
+print(f"  Outcome: {result4['status']}. Tariff: ${result4['tariff_amount']:.2f} ({result4['tariff_rate']*100:.1f}%). {result4['advice']}")
+print(f"  Estimated Landed Cost: ${result4.get('total_landed_cost_estimate', 'N/A'):,.2f}")
+
+result5 = check_trade_regulations_and_tariffs("Germany", "CountryA", "Machinery", 25000) # Test EU preferential rate
+print(f"  Outcome: {result5['status']}. Tariff: ${result5['tariff_amount']:.2f} ({result5['tariff_rate']*100:.1f}%). {result5['advice']}")
+print(f"  Estimated Landed Cost: ${result5.get('total_landed_cost_estimate', 'N/A'):,.2f}")
+
+result6 = check_trade_regulations_and_tariffs("India", "CountryX", "NewProduct", 7000) # Test default policy and tariff
+print(f"  Outcome: {result6['status']}. Tariff: ${result6['tariff_amount']:.2f} ({result6['tariff_rate']*100:.1f}%). {result6['advice']}")
+print(f"  Estimated Landed Cost: ${result6.get('total_landed_cost_estimate', 'N/A'):,.2f}")
