@@ -1,0 +1,36 @@
+import re
+import spacy
+from spacy.matcher import PhraseMatcher
+
+class ComplianceChecker:
+    def __init__(self):
+        self.nlp = spacy.load('en_core_web_sm')
+        self.red_flags = {
+            'labor': ['child labor', 'forced labor', 'excessive overtime'],
+            'environment': ['illegal dumping', 'deforestation', 'hazardous waste'],
+            'safety': ['unsafe conditions', 'lack of PPE', 'fire hazards']
+        }
+        self.matcher = PhraseMatcher(self.nlp.vocab)
+        for category, phrases in self.red_flags.items():
+            self.matcher.add(category, None, *[self.nlp(text) for text in phrases])
+    
+    def analyze_report(self, text):
+        doc = self.nlp(text)
+        matches = self.matcher(doc)
+        findings = {}
+        for match_id, start, end in matches:
+            category = self.nlp.vocab.strings[match_id]
+            findings.setdefault(category, []).append(doc[start:end].text)
+        return findings
+
+# Usage
+checker = ComplianceChecker()
+audit_report = """
+Workers reported frequent mandatory overtime exceeding legal limits. 
+Safety inspections revealed multiple instances of missing safety equipment.
+"""
+
+results = checker.analyze_report(audit_report)
+print("Compliance issues found:")
+for category, issues in results.items():
+    print(f"{category.title()}: {', '.join(set(issues))}")
