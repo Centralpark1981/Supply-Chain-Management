@@ -1,0 +1,23 @@
+def abc_analysis(inventory_data):
+    """
+    Performs ABC analysis on inventory items
+    Args:
+        inventory_data: DataFrame with ['SKU', 'Annual_Usage_Value']
+    Returns:
+        DataFrame with ABC classifications
+    """
+    df = inventory_data.sort_values('Annual_Usage_Value', ascending=False)
+    df['Cumulative_Pct'] = df['Annual_Usage_Value'].cumsum() / df['Annual_Usage_Value'].sum() * 100
+    
+    df['Category'] = 'C'
+    df.loc[df['Cumulative_Pct'] <= 80, 'Category'] = 'A'
+    df.loc[(df['Cumulative_Pct'] > 80) & (df['Cumulative_Pct'] <= 95), 'Category'] = 'B'
+    
+    return df
+
+# Example usage:
+inventory_df = pd.DataFrame({
+    'SKU': [f'ITEM_{i}' for i in range(1, 21)],
+    'Annual_Usage_Value': np.random.lognormal(3, 1, 20)
+})
+print(abc_analysis(inventory_df))
