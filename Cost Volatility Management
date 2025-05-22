@@ -1,0 +1,35 @@
+from prophet import Prophet
+import pandas as pd
+import numpy as np
+
+class CostAnalyzer:
+    def __init__(self):
+        self.models = {}
+    
+    def train_price_model(self, commodity, historical_data):
+        model = Prophet(weekly_seasonality=False, daily_seasonality=False)
+        model.fit(historical_data.rename(columns={'date':'ds', 'price':'y'}))
+        self.models[commodity] = model
+    
+    def forecast_prices(self, commodity, periods=365):
+        future = self.models[commodity].make_future_dataframe(periods=periods)
+        return self.models[commodity].predict(future)
+    
+    def monte_carlo_simulation(self, base_quantity, forecast, iterations=1000):
+        simulations = np.random.normal(
+            forecast['yhat'], 
+            forecast['yhat_std'],
+            (iterations, len(forecast))
+        return simulations * base_quantity
+
+# Usage
+copper_data = pd.DataFrame({
+    'date': pd.date_range(start='2020-01-01', periods=1000, freq='D'),
+    'price': np.random.normal(8.5, 0.5, 1000).cumsum()
+})
+
+ca = CostAnalyzer()
+ca.train_price_model('copper', copper_data)
+forecast = ca.forecast_prices('copper', 90)
+cost_simulations = ca.monte_carlo_simulation(1000, forecast)
+print(f"Expected cost range: ${cost_simulations.mean(axis=0)[-1]:.2f} ± {cost_simulations.std(axis=0)[-1]:.2f}")
