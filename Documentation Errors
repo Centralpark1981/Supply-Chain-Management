@@ -1,0 +1,120 @@
+# Documentation Error Prevention
+# --- Simulated Data ---
+# (trade_type, destination_region_category, specific_condition (optional)): [required_docs]
+# Destination region category could be e.g., 'EU', 'NorthAmerica', 'Asia', 'RestrictedZone'
+required_documents_rules = {
+    ('export', 'EU', 'standard'): [
+        "Commercial Invoice", "Packing List", "Bill of Lading/Air Waybill", 
+        "Certificate of Origin (EUR.1 if applicable)", "Export Declaration (EX-A)"
+    ],
+    ('import', 'USA', 'foodstuff'): [
+        "Commercial Invoice", "Packing List", "Bill of Lading/Air Waybill", 
+        "Certificate of Origin", "Import Permit (FDA)", "Health Certificate"
+    ],
+    ('export', 'Asia', 'electronics'): [
+        "Commercial Invoice", "Packing List", "Air Waybill", "Certificate of Origin", "Shipper's Letter of Instruction"
+    ],
+    ('import', 'Canada', 'general_goods'): [
+        "Commercial Invoice", "Packing List", "Canada Customs Invoice (CCI)", "Bill of Lading"
+    ],
+    ('export', 'RestrictedZone', 'any'): [ # Example for high-scrutiny zone
+        "Commercial Invoice", "Packing List", "End-User Certificate", "Export License", "Proof of Insurance"
+    ]
+}
+# Default set of documents if no specific rule matches
+default_required_documents = [
+    "Commercial Invoice", "Packing List", "Bill of Lading/Air Waybill"
+]
+
+def get_required_documents(trade_type, destination_country_code, product_category, is_restricted_zone=False):
+    """
+    Determines the list of required documents.
+    This is a simplified model; real systems use complex rule engines.
+    """
+    # Simplified logic to categorize destination and product for rule matching
+    if destination_country_code in ["DEU", "FRA", "ESP"]: # Example EU countries
+        region_category = "EU"
+    elif destination_country_code in ["USA", "MEX"]:
+        region_category = "USA" if destination_country_code == "USA" else "NorthAmerica"
+    elif destination_country_code in ["CHN", "JPN", "KOR"]:
+        region_category = "Asia"
+    elif destination_country_code == "CAN":
+        region_category = "Canada"
+    else:
+        region_category = "Other"
+
+    if is_restricted_zone: # Override for restricted zones
+        key = (trade_type, 'RestrictedZone', 'any')
+        if key in required_documents_rules:
+            return required_documents_rules[key]
+
+    # Simplified condition based on product category
+    condition = 'standard'
+    if product_category.lower() == 'foodstuff' and region_category == "USA" and trade_type == 'import':
+        condition = 'foodstuff'
+    elif product_category.lower() == 'electronics' and region_category == "Asia" and trade_type == 'export':
+        condition = 'electronics'
+    elif region_category == "Canada" and product_category.lower() == 'general_goods' and trade_type == 'import':
+        condition = 'general_goods'
+
+
+    key_to_check = (trade_type, region_category, condition)
+    if key_to_check in required_documents_rules:
+        return required_documents_rules[key_to_check]
+    
+    # Fallback to more generic rule for the region if specific condition not met
+    generic_key = (trade_type, region_category, 'standard') # Assuming 'standard' or 'any' as generic
+    if generic_key in required_documents_rules:
+        return required_documents_rules[generic_key]
+        
+    return default_required_documents
+
+
+def verify_shipment_documents(shipment_id, trade_type, destination_country_code, product_category, provided_documents, is_restricted_zone=False):
+    """
+    Verifies if all required documents for a shipment are provided.
+    """
+    print(f"\n📄 Verifying documents for Shipment ID: {shipment_id} ({trade_type} to {destination_country_code}, Product: {product_category})")
+    
+    required_docs = get_required_documents(trade_type, destination_country_code, product_category, is_restricted_zone)
+    provided_docs_set = set(doc.strip().lower() for doc in provided_documents) # Case-insensitive check
+    required_docs_set = set(doc.strip().lower() for doc in required_docs)
+
+    missing_documents = list(required_docs_set - provided_docs_set)
+    extra_documents = list(provided_docs_set - required_docs_set) # Documents provided but not in the 'required' list
+
+    if not missing_documents:
+        status = "Complete"
+        message = "All required documents appear to be provided."
+        if extra_documents:
+            message += f" Extra documents provided: {', '.join(extra_documents)}."
+    else:
+        status = "Incomplete"
+        message = f"Missing documents: {', '.join(missing_documents)}."
+        if extra_documents:
+            message += f" Additionally, extra documents provided: {', '.join(extra_documents)}."
+            
+    print(f"  Required: {', '.join(required_docs)}")
+    print(f"  Provided: {', '.join(provided_documents)}")
+    print(f"  Status: {status} - {message}")
+    return {"status": status, "missing": missing_documents, "required": required_docs, "provided": provided_documents, "extra": extra_documents}
+
+# Example Usage
+print("\n--- Documentation Error Check ---")
+docs1 = ["Commercial Invoice", "Packing List", "Bill of Lading/Air Waybill", "Certificate of Origin (EUR.1 if applicable)", "Export Declaration (EX-A)"]
+verify_shipment_documents("SHP001", "export", "DEU", "machinery", docs1) # DEU -> EU
+
+docs2 = ["Commercial Invoice", "Packing List"] # Missing several
+verify_shipment_documents("SHP002", "import", "USA", "foodstuff", docs2)
+
+docs3 = ["Commercial Invoice", "Packing List", "Air Waybill", "Certificate of Origin", "Shipper's Letter of Instruction", "Random Other Doc"]
+verify_shipment_documents("SHP003", "export", "CHN", "electronics", docs3)
+
+docs4 = ["Commercial Invoice", "Packing List", "Canada Customs Invoice (CCI)"] # Missing Bill of Lading
+verify_shipment_documents("SHP004", "import", "CAN", "general_goods", docs4)
+
+docs5 = ["Commercial Invoice", "Packing List", "End-User Certificate"] # Missing some for restricted zone
+verify_shipment_documents("SHP005", "export", "RZN", "sensitive_parts", docs5, is_restricted_zone=True)
+
+docs6 = ["invoice", "packlist", "bol"] # Test default and case-insensitivity
+verify_shipment_documents("SHP006", "export", "GBR", "toys", ["Invoice", "Packlist", "BOL"])
