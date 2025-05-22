@@ -1,0 +1,22 @@
+import pandas as pd
+
+def detect_inventory_discrepancies(wms_data, physical_count):
+    """
+    Identifies inventory discrepancies between WMS records and physical counts
+    Args:
+        wms_data: CSV path to WMS inventory data
+        physical_count: CSV path to physical count data
+    Returns:
+        DataFrame with discrepancies
+    """
+    wms_df = pd.read_csv(wms_data)
+    physical_df = pd.read_csv(physical_count)
+    
+    merged = pd.merge(wms_df, physical_df, on='SKU', suffixes=('_WMS', '_Physical'))
+    merged['Discrepancy'] = merged['Quantity_Physical'] - merged['Quantity_WMS']
+    
+    return merged[abs(merged['Discrepancy']) > 0]
+
+# Example usage:
+discrepancies = detect_inventory_discrepancies('wms_inventory.csv', 'physical_count.csv')
+print("Inventory Discrepancies:\n", discrepancies)
