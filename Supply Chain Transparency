@@ -1,0 +1,29 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+
+class SupplyChainMapper:
+    def __init__(self):
+        self.graph = nx.DiGraph()
+        
+    def add_relationships(self, relationships):
+        self.graph.add_edges_from(relationships)
+    
+    def visualize_network(self):
+        pos = nx.spring_layout(self.graph)
+        nx.draw(self.graph, pos, with_labels=True, node_size=2000)
+        plt.show()
+    
+    def identify_unknown_suppliers(self):
+        return [node for node, data in self.graph.nodes(data=True) 
+                if not data.get('verified', False)]
+
+# Usage
+scm = SupplyChainMapper()
+scm.add_relationships([
+    ('Raw Material Co', 'Tier1 Supplier', {'verified': True}),
+    ('Tier1 Supplier', 'Our Factory', {'verified': True}),
+    ('Subcomponent Ltd', 'Tier1 Supplier', {'verified': False})
+])
+
+print("Unknown suppliers:", scm.identify_unknown_suppliers())
+scm.visualize_network()
