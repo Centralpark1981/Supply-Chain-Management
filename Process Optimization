@@ -1,0 +1,29 @@
+import itertools
+
+def optimize_picking_route(locations):
+    """
+    Optimizes picking route using nearest neighbor heuristic
+    Args:
+        locations: List of (x,y) coordinates representing pick locations
+    Returns:
+        Optimized route order
+    """
+    if not locations:
+        return []
+    
+    current = locations[0]
+    unvisited = set(locations[1:])
+    route = [current]
+    
+    while unvisited:
+        nearest = min(unvisited, key=lambda x: abs(x[0]-current[0]) + abs(x[1]-current[1]))
+        route.append(nearest)
+        unvisited.remove(nearest)
+        current = nearest
+    
+    return route
+
+# Example usage:
+warehouse_locations = [(0,0), (3,4), (1,2), (4,3), (2,5)]
+optimized_route = optimize_picking_route(warehouse_locations)
+print("Optimized Picking Route:", optimized_route)
