@@ -1,0 +1,48 @@
+# Maverick Buying Detection
+approved_suppliers = ["SupplierA", "SupplierB", "SupplierC"]
+preferred_contracts = {
+    "ProductX": "Contract001",
+    "ProductY": "Contract002",
+    "ProductZ": "Contract001"
+}
+
+def check_maverick_buy(item_name, supplier_name, contract_id=None):
+    """
+    Checks if a purchase is potentially a maverick buy.
+    Returns a message indicating compliance or potential maverick buying.
+    """
+    if supplier_name not in approved_suppliers:
+        return f"⚠️ **Warning**: Supplier '{supplier_name}' is not an approved supplier. This might be a maverick buy."
+
+    if item_name in preferred_contracts:
+        if contract_id == preferred_contracts[item_name]:
+            return f"✅ Purchase of '{item_name}' from '{supplier_name}' via contract '{contract_id}' is compliant."
+        elif contract_id:
+            return f"⚠️ **Warning**: Purchase of '{item_name}' from '{supplier_name}'. Contract '{contract_id}' is not the preferred contract ('{preferred_contracts[item_name]}'). Potential maverick buy."
+        else:
+            return f"ℹ️ Purchase of '{item_name}' from '{supplier_name}'. No contract specified, but preferred contract is '{preferred_contracts[item_name]}'."
+    
+    if contract_id:
+         return f"✅ Purchase of '{item_name}' from '{supplier_name}' via contract '{contract_id}' (item not in preferred contract list)."
+    
+    return f"✅ Purchase of '{item_name}' from '{supplier_name}' (no specific contract required or supplier is approved)."
+
+# Example Usage
+print("--- Maverick Buying Check ---")
+# Compliant purchase
+print(check_maverick_buy("ProductX", "SupplierA", "Contract001"))
+
+# Maverick buy - unapproved supplier
+print(check_maverick_buy("ProductW", "SupplierD"))
+
+# Potential maverick buy - wrong contract
+print(check_maverick_buy("ProductY", "SupplierB", "Contract003"))
+
+# Purchase from approved supplier, item not in preferred list, but contract provided
+print(check_maverick_buy("ProductK", "SupplierC", "Contract004"))
+
+# Purchase from approved supplier, item not in preferred list, no contract provided
+print(check_maverick_buy("ProductL", "SupplierA"))
+
+# Purchase of item with preferred contract, but no contract provided in request
+print(check_maverick_buy("ProductZ", "SupplierA"))
