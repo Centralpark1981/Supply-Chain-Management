@@ -1,0 +1,161 @@
+# Production Bottlenecks Identification
+import random
+import time # For simulating processing time
+
+# --- Configuration ---
+PRODUCTION_STAGES_CONFIG = [
+    {"name": "Cutting", "base_process_time_sec": 2, "capacity_units_per_cycle": 1, "downtime_prob": 0.02, "downtime_duration_sec": 60},
+    {"name": "Assembly A", "base_process_time_sec": 5, "capacity_units_per_cycle": 1, "downtime_prob": 0.05, "downtime_duration_sec": 120},
+    {"name": "Assembly B", "base_process_time_sec": 4, "capacity_units_per_cycle": 1, "downtime_prob": 0.03, "downtime_duration_sec": 90},
+    {"name": "Welding", "base_process_time_sec": 7, "capacity_units_per_cycle": 1, "downtime_prob": 0.07, "downtime_duration_sec": 180}, # Potential bottleneck
+    {"name": "Painting", "base_process_time_sec": 3, "capacity_units_per_cycle": 2, "downtime_prob": 0.04, "downtime_duration_sec": 100},
+    {"name": "Packaging", "base_process_time_sec": 2, "capacity_units_per_cycle": 3, "downtime_prob": 0.01, "downtime_duration_sec": 30},
+]
+
+class ProductionStage:
+    def __init__(self, name, base_process_time_sec, capacity_units_per_cycle, downtime_prob, downtime_duration_sec):
+        self.name = name
+        self.base_process_time_sec = base_process_time_sec
+        self.capacity_units_per_cycle = capacity_units_per_cycle # How many units can be processed simultaneously in one cycle time
+        self.downtime_prob = downtime_prob
+        self.downtime_duration_sec = downtime_duration_sec
+        self.wip = 0 # Work-In-Progress
+        self.units_processed = 0
+        self.time_processing_sec = 0
+        self.time_idle_sec = 0
+        self.time_down_sec = 0
+        self.is_down_until = 0 # Timestamp until which the stage is down
+
+    def process_unit(self, current_time_sec):
+        if current_time_sec < self.is_down_until:
+            self.time_down_sec += 1 # Assuming simulation ticks by 1 second for this part
+            return 0 # Still down
+
+        if random.random() < self.downtime_prob / self.base_process_time_sec: # Chance of downtime per second of processing
+            print(f"⚠️ {self.name} encountered downtime for {self.downtime_duration_sec}s!")
+            self.is_down_until = current_time_sec + self.downtime_duration_sec
+            self.time_down_sec += 1
+            return 0
+
+        if self.wip > 0:
+            # Simulate processing for one cycle, potentially multiple units if capacity allows
+            processed_this_cycle = min(self.wip, self.capacity_units_per_cycle)
+            
+            # Actual processing time can vary slightly
+            actual_process_time = self.base_process_time_sec + random.uniform(-0.5, 0.5)
+            self.time_processing_sec += actual_process_time * processed_this_cycle
+            
+            # For simulation simplicity, assume units are processed one by one within the capacity
+            self.wip -= processed_this_cycle
+            self.units_processed += processed_this_cycle
+            return processed_this_cycle
+        else:
+            self.time_idle_sec += 1 # Assuming simulation ticks by 1 second
+            return 0
+
+def simulate_production_line(stages_config, num_units_to_produce, simulation_tick_sec=1):
+    """Simulates production flow and identifies bottlenecks."""
+    print(f"\n🏭 Simulating production of {num_units_to_produce} units...")
+    stages = [ProductionStage(**config) for config in stages_config]
+    total_units_produced = 0
+    current_simulation_time_sec = 0
+    max_simulation_time_sec = num_units_to_produce * sum(s.base_process_time_sec for s in stages) * 2 # Generous estimate
+
+    # Feed initial WIP to the first stage
+    stages[0].wip = num_units_to_produce 
+    
+    processed_through_all_stages = [0] * len(stages)
+
+    while processed_through_all_stages[-1] < num_units_to_produce and current_simulation_time_sec < max_simulation_time_sec:
+        for i in range(len(stages)):
+            stage = stages[i]
+            
+            # If the stage is down, it cannot process
+            if current_simulation_time_sec < stage.is_down_until:
+                stage.time_down_sec += simulation_tick_sec
+                continue # Skip to next stage or next tick
+
+            # If there's WIP and stage is not down
+            if stage.wip > 0:
+                # How many units can this stage attempt to process in this tick?
+                # Based on its base_process_time. If tick is 1s, and process time is 5s, it processes 1/5th of a unit.
+                # Simplified: if enough time has passed for one cycle for this stage.
+                # This is a discrete event approximation.
+                
+                # A unit (or capacity_units_per_cycle) takes base_process_time_sec.
+                # In one simulation_tick_sec, it can process (simulation_tick_sec / base_process_time_sec) fraction of its capacity.
+                # This gets complex. Let's simplify: process one unit if WIP available and not down.
+                
+                units_out_this_tick = 0
+                if random.random() < (simulation_tick_sec / stage.base_process_time_sec): # Probabilistic processing based on time
+                    if random.random() > stage.downtime_prob : # Check for downtime again for this attempt
+                        processed_count = min(stage.wip, stage.capacity_units_per_cycle)
+                        stage.wip -= processed_count
+                        stage.units_processed += processed_count
+                        stage.time_processing_sec += stage.base_process_time_sec * processed_count # Approximate time
+                        units_out_this_tick = processed_count
+                    else:
+                        print(f"⚠️ {stage.name} encountered downtime for {stage.downtime_duration_sec}s!")
+                        stage.is_down_until = current_simulation_time_sec + stage.downtime_duration_sec
+                        stage.time_down_sec += simulation_tick_sec
+
+
+                if units_out_this_tick > 0:
+                    processed_through_all_stages[i] += units_out_this_tick
+                    if i + 1 < len(stages):
+                        stages[i+1].wip += units_out_this_tick # Move to next stage
+                elif stage.wip == 0:
+                     stage.time_idle_sec += simulation_tick_sec
+            else: # No WIP
+                stage.time_idle_sec += simulation_tick_sec
+        
+        current_simulation_time_sec += simulation_tick_sec
+        if current_simulation_time_sec % (100 * simulation_tick_sec) == 0: # Log progress
+            print(f"  Sim Time: {current_simulation_time_sec}s, Final Stage Output: {processed_through_all_stages[-1]}/{num_units_to_produce}")
+
+
+    print("\n--- Bottleneck Analysis ---")
+    print(f"Simulation completed in {current_simulation_time_sec} seconds (simulated).")
+    print(f"Total units passed through final stage: {processed_through_all_stages[-1]}")
+
+    print(f"{'Stage Name':<15} | {'Units Proc.':<12} | {'WIP Left':<10} | {'Proc. Time (s)':<15} | {'Idle Time (s)':<15} | {'Down Time (s)':<15} | {'Avg Time/Unit (s)':<18}")
+    print("-" * 120)
+    
+    bottlenecks = []
+    max_wip = 0
+    max_avg_time = 0
+
+    for i, stage in enumerate(stages):
+        avg_time_per_unit = (stage.time_processing_sec + stage.time_down_sec) / stage.units_processed if stage.units_processed > 0 else float('inf')
+        print(f"{stage.name:<15} | {stage.units_processed:<12} | {stage.wip:<10} | {stage.time_processing_sec:<15.0f} | {stage.time_idle_sec:<15.0f} | {stage.time_down_sec:<15.0f} | {avg_time_per_unit:<18.2f}")
+        
+        # Identify bottlenecks by high WIP remaining (if not the last stage) or high average processing time
+        if i < len(stages) -1 and stage.wip > max_wip : max_wip = stage.wip
+        if stage.units_processed > 0 and avg_time_per_unit != float('inf') and avg_time_per_unit > max_avg_time: max_avg_time = avg_time_per_unit
+
+    for i, stage in enumerate(stages):
+        avg_time_per_unit = (stage.time_processing_sec + stage.time_down_sec) / stage.units_processed if stage.units_processed > 0 else float('inf')
+        is_bottleneck = False
+        reason = []
+        if i < len(stages) -1 and stage.wip > num_units_to_produce * 0.1 and stage.wip >= max_wip * 0.7: # Significant WIP
+            is_bottleneck = True
+            reason.append("High WIP")
+        if stage.units_processed > 0 and avg_time_per_unit > (sum(s.base_process_time_sec for s in stages) / len(stages)) * 1.5 and avg_time_per_unit >= max_avg_time * 0.8: # Significantly slower
+            is_bottleneck = True
+            reason.append("High Avg Proc Time")
+        if stage.time_down_sec > current_simulation_time_sec * 0.1 : # High downtime
+            is_bottleneck = True
+            reason.append("High Downtime")
+        if is_bottleneck:
+            bottlenecks.append(f"{stage.name} (Reason: {', '.join(reason)})")
+
+
+    if bottlenecks:
+        print(f"\n🚨 Potential Bottlenecks Identified: {', '.join(bottlenecks)}")
+    else:
+        print("\n✅ No major bottlenecks identified based on current criteria.")
+    
+    return stages
+
+# Example Usage
+simulate_production_line(PRODUCTION_STAGES_CONFIG, num_units_to_produce=100, simulation_tick_sec=1)
