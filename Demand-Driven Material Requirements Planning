@@ -1,0 +1,145 @@
+Python
+# ddmrp_buffer.py – Calculadora de Buffer DDMRP
+
+import matplotlib.pyplot as plt
+
+def obtener_float(prompt, default=None):
+    """
+    Solicita al usuario un número flotante.
+
+    Args:
+        prompt (str): El mensaje a mostrar al usuario.
+        default (float, optional): El valor por defecto si el usuario no ingresa nada. Defaults to None.
+
+    Returns:
+        float: El número ingresado por el usuario o el valor por defecto.
+    """
+    while True:
+        entrada = input(f"{prompt}{f' [{default}]' if default is not None else ''}: ").strip()
+        if not entrada and default is not None:
+            return float(default)
+        try:
+            return float(entrada)
+        except ValueError:
+            print("⛔️ Entrada no válida. Por favor ingresa un número.")
+
+def calcular_buffer_ddmrp(adu, ltf, vf, moq, ciclo_orden, dlt):
+    """
+    Calcula los niveles del buffer DDMRP y métricas relacionadas.
+
+    Args:
+        adu (float): Average Daily Usage (ADU).
+        ltf (float): Lead-Time Factor (LTF).
+        vf (float): Variability Factor (VF).
+        moq (float): MOQ (unidades).
+        ciclo_orden (float): Order cycle (días).
+        dlt (float): Decoupled Lead Time (DLT) días.
+
+    Returns:
+        dict: Un diccionario con los resultados del cálculo.
+    """
+    # 1. Zonas
+    amarillo = adu * dlt
+    candidatos_verde = {
+        "MOQ": moq,
+        "Ciclo de Orden × ADU": ciclo_orden * adu,
+        "LTF × ADU × DLT": ltf * adu * dlt
+    }
+    verde = max(candidatos_verde.values())
+    rojo_base = ltf * adu * dlt
+    rojo_seguridad = rojo_base * vf
+    rojo_total = rojo_base + rojo_seguridad
+
+    # 2. Top-of-zones
+    tope_verde = verde + amarillo + rojo_total
+    tope_amarillo = amarillo + rojo_total
+    tope_rojo = rojo_total
+
+    # 3. Métricas
+    inventario_promedio = rojo_total + verde / 2
+    maximo_en_mano = rojo_total + verde
+    frecuencia_orden_promedio = verde / adu
+    dias_seguridad = rojo_total / adu
+    ordenes_abiertas_promedio = amarillo / verde if verde != 0 else float('inf') # Evitar división por cero
+
+    return {
+        "amarillo": amarillo,
+        "verde": verde,
+        "candidatos_verde": candidatos_verde,
+        "rojo_base": rojo_base,
+        "rojo_seguridad": rojo_seguridad,
+        "rojo_total": rojo_total,
+        "tope_verde": tope_verde,
+        "tope_amarillo": tope_amarillo,
+        "tope_rojo": tope_rojo,
+        "inventario_promedio": inventario_promedio,
+        "maximo_en_mano": maximo_en_mano,
+        "frecuencia_orden_promedio": frecuencia_orden_promedio,
+        "dias_seguridad": dias_seguridad,
+        "ordenes_abiertas_promedio": ordenes_abiertas_promedio
+    }
+
+def graficar_buffer(resultados):
+    """
+    Genera una gráfica del perfil del buffer DDMRP.
+
+    Args:
+        resultados (dict): Un diccionario con los resultados del cálculo.
+    """
+    rojo_total = resultados["rojo_total"]
+    amarillo = resultados["amarillo"]
+    verde = resultados["verde"]
+    inventario_promedio = resultados["inventario_promedio"]
+    tope_verde = resultados["tope_verde"]
+
+    plt.figure(figsize=(4, 8))
+    plt.bar(0, rojo_total, color='red', label='Zona Roja')
+    plt.bar(0, amarillo, bottom=rojo_total, color='yellow', label='Zona Amarilla')
+    plt.bar(0, verde, bottom=rojo_total + amarillo, color='green', label='Zona Verde')
+    plt.text(0, rojo_total / 2, f"{rojo_total:.0f}", ha='center', va='center', color='white', fontweight='bold')
+    plt.text(0, rojo_total + amarillo / 2, f"{amarillo:.0f}", ha='center', va='center', color='black', fontweight='bold')
+    plt.text(0, rojo_total + amarillo + verde / 2, f"{verde:.0f}", ha='center', va='center', color='white', fontweight='bold')
+    plt.scatter(0, inventario_promedio, color='black', s=50, zorder=5, label='Inventario Promedio')
+    plt.text(0, inventario_promedio, f" IP {inventario_promedio:.0f}", ha='left', va='center', fontsize=9)
+    plt.ylim(0, tope_verde * 1.1)
+    plt.xticks([])
+    plt.ylabel('Unidades')
+    plt.title('Perfil de Buffer DDMRP')
+    plt.legend()
+    plt.tight_layout() # Ajusta el espaciado para evitar etiquetas cortadas
+    plt.show()
+
+def main():
+    print("📥  === Parámetros de entrada ===")
+    adu = obtener_float("Average Daily Usage (ADU)")
+    ltf = obtener_float("Lead-Time Factor (LTF)")
+    vf = obtener_float("Variability Factor (VF)")
+    moq = obtener_float("MOQ (unidades)")
+    ciclo_orden = obtener_float("Order cycle (días)")
+    dlt = obtener_float("Decoupled Lead Time (DLT) días")
+
+    resultados = calcular_buffer_ddmrp(adu, ltf, vf, moq, ciclo_orden, dlt)
+
+    print("\n📊  === Resultados ===")
+    print(f"Zona Amarilla (ADU × DLT): {resultados['amarillo']:.0f}")
+    print("\nZona Verde ▸")
+    for nombre, valor in resultados['candidatos_verde'].items():
+        print(f"   {nombre}: {valor:.0f}")
+    print(f"   → Verde (máx): {resultados['verde']:.0f}")
+    print("\nZona Roja ▸")
+    print(f"   RZ base      : {resultados['rojo_base']:.0f}")
+    print(f"   RZ seguridad : {resultados['rojo_seguridad']:.0f}")
+    print(f"   Total Rojo   : {resultados['rojo_total']:.0f}\n")
+    print(f"Tope Verde  : {resultados['tope_verde']:.0f}")
+    print(f"Tope Amarillo: {resultados['tope_amarillo']:.0f}")
+    print(f"Tope Rojo   : {resultados['tope_rojo']:.0f}")
+    print(f"Avg IP      : {resultados['inventario_promedio']:.0f}")
+    print(f"Max OH      : {resultados['maximo_en_mano']:.0f}\n")
+    print(f"Frecuencia de orden prom. (días): {resultados['frecuencia_orden_promedio']:.1f}")
+    print(f"Días de seguridad                : {resultados['dias_seguridad']:.1f}")
+    print(f"Avg # de órdenes abiertas        : {resultados['ordenes_abiertas_promedio']:.1f}")
+
+    graficar_buffer(resultados)
+
+if __name__ == "__main__":
+    main()
