@@ -1,0 +1,132 @@
+# Compliance Risk: Sanctions Screening
+# --- Simulated Data ---
+# (In real systems, these lists are extensive, dynamic, and sourced from government/third-party providers)
+sanctioned_entities_list = {
+    "Alpha Corp".lower(): "UN Sanctions List XYZ - Arms Embargo",
+    "Bad Actor Inc.".lower(): "US OFAC SDN List - Financial Restrictions",
+    "John Doe".lower(): "EU Consolidated List - Asset Freeze", # Example individual
+}
+
+restricted_countries_list = {
+    "CountrySanctioned": "Comprehensive trade embargo (UN Resolution ABC)",
+    "RegionRisk": "High risk for diversion of dual-use goods (National Advisory)",
+}
+
+high_risk_goods_categories = {
+    "weaponry_components": "Strict export controls apply, license mandatory.",
+    "advanced_encryption_tech": "Dual-use item, subject to review.",
+    "nuclear_materials": "Heavily restricted, specific authorization required.",
+}
+
+def check_entity_sanctions(entity_name):
+    """Checks if an entity name is on the sanctioned list. Simplified exact match."""
+    # Real-world systems use fuzzy matching, aliases, phonetic algorithms, etc.
+    entity_name_lower = entity_name.lower()
+    if entity_name_lower in sanctioned_entities_list:
+        return True, f"Entity '{entity_name}' found on sanctions list: {sanctioned_entities_list[entity_name_lower]}"
+    return False, f"Entity '{entity_name}' not found on monitored sanctions lists."
+
+def check_country_restrictions(country_name):
+    """Checks if a country is on a restricted list."""
+    if country_name in restricted_countries_list:
+        return True, f"Country '{country_name}' has restrictions: {restricted_countries_list[country_name]}"
+    return False, f"Country '{country_name}' has no general top-level restrictions found in this check."
+
+def check_goods_restrictions(product_categories_list):
+    """Checks if any provided product categories are high-risk."""
+    risks_found = []
+    for category in product_categories_list:
+        cat_lower = category.lower()
+        if cat_lower in high_risk_goods_categories:
+            risks_found.append(f"Product category '{category}' is high-risk: {high_risk_goods_categories[cat_lower]}")
+    if risks_found:
+        return True, risks_found
+    return False, ["No specific high-risk goods categories identified in this shipment."]
+
+
+def perform_compliance_screening(transaction_id, customer_name, destination_country, product_categories):
+    """
+    Performs a series of compliance checks for a transaction.
+    """
+    print(f"\n🛡️ Performing compliance screening for Transaction ID: {transaction_id}")
+    print(f"  Customer: {customer_name}, Destination: {destination_country}, Products: {', '.join(product_categories)}")
+    
+    overall_risk_level = "Low"
+    findings = []
+
+    # Entity Screening
+    is_sanctioned_entity, entity_message = check_entity_sanctions(customer_name)
+    findings.append(f"  Entity Check: {entity_message}")
+    if is_sanctioned_entity:
+        overall_risk_level = "Critical" # Highest risk
+
+    # Country Screening
+    is_restricted_country, country_message = check_country_restrictions(destination_country)
+    findings.append(f"  Country Check: {country_message}")
+    if is_restricted_country and overall_risk_level != "Critical":
+        overall_risk_level = "High"
+
+    # Goods Screening
+    are_goods_restricted, goods_messages = check_goods_restrictions(product_categories)
+    findings.append("  Goods Check:")
+    for msg in goods_messages:
+        findings.append(f"    - {msg}")
+    if are_goods_restricted and overall_risk_level not in ["Critical", "High"]:
+        overall_risk_level = "Medium"
+    
+    # Summarize
+    print("\n  Screening Summary:")
+    for finding in findings:
+        print(finding)
+    
+    action_advice = ""
+    if overall_risk_level == "Critical":
+        action_advice = "STOP TRANSACTION IMMEDIATELY. Report to compliance officer. Do not proceed."
+    elif overall_risk_level == "High":
+        action_advice = "High Risk. Requires enhanced due diligence and compliance officer approval before proceeding."
+    elif overall_risk_level == "Medium":
+        action_advice = "Medium Risk. Review carefully. Ensure all licenses are in place if applicable."
+    else: # Low
+        action_advice = "Low Risk. Standard processing can continue. Maintain records."
+        
+    print(f"\n  Overall Assessed Risk Level: {overall_risk_level}")
+    print(f"  Recommended Action: {action_advice}")
+
+    return {"transaction_id": transaction_id, "overall_risk": overall_risk_level, "findings": findings, "advice": action_advice}
+
+# Example Usage
+print("\n--- Compliance Risk Screening Simulation ---")
+perform_compliance_screening(
+    "TRN001", 
+    "Alpha Corp", 
+    "CountryNormal", 
+    ["general_electronics", "spare_parts"]
+)
+
+perform_compliance_screening(
+    "TRN002", 
+    "Beta Logistics", 
+    "CountrySanctioned", 
+    ["food_supplies", "clothing"]
+)
+
+perform_compliance_screening(
+    "TRN003", 
+    "Gamma Trading", 
+    "CountryNormal", 
+    ["machine_tools", "advanced_encryption_tech"]
+)
+
+perform_compliance_screening(
+    "TRN004", 
+    "John Doe", # Sanctioned Individual
+    "RegionRisk", 
+    ["personal_effects"]
+)
+
+perform_compliance_screening(
+    "TRN005", 
+    "InnoTech Solutions", 
+    "CountrySafe", 
+    ["office_supplies", "software_basic"]
+)
