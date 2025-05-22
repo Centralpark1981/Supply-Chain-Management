@@ -1,0 +1,27 @@
+from datetime import datetime, timedelta
+
+def schedule_inventory_audits(sku_list, last_audit_dates, accuracy_history, threshold=0.95):
+    """
+    Generates prioritized audit schedule based on accuracy history
+    Args:
+        sku_list: List of SKUs
+        last_audit_dates: List of datetime objects
+        accuracy_history: List of accuracy percentages (0-1)
+        threshold: Accuracy threshold for prioritization
+    Returns:
+        List of SKUs prioritized for audit
+    """
+    audit_priority = []
+    for sku, last_audit, accuracy in zip(sku_list, last_audit_dates, accuracy_history):
+        days_since_audit = (datetime.now() - last_audit).days
+        audit_score = (1 - accuracy) * 0.7 + days_since_audit/365 * 0.3
+        if accuracy < threshold or days_since_audit > 90:
+            audit_priority.append((sku, audit_score))
+    
+    return [sku for sku, _ in sorted(audit_priority, key=lambda x: x[1], reverse=True)]
+
+# Example usage:
+skus = ['A001', 'B002', 'C003']
+last_audits = [datetime(2024,1,15), datetime(2024,2,20), datetime(2023,12,1)]
+accuracy = [0.97, 0.89, 0.92]
+print("Audit Priority:", schedule_inventory_audits(skus, last_audits, accuracy))
