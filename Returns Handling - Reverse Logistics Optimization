@@ -1,0 +1,29 @@
+import heapq
+from collections import deque
+
+class ReverseLogistics:
+    def __init__(self, warehouse_location):
+        self.warehouse = warehouse_location
+        self.returns = []
+        
+    def add_return(self, location, priority):
+        """Add return with priority (lower = more urgent)"""
+        distance = np.linalg.norm(np.array(location) - np.array(self.warehouse))
+        heapq.heappush(self.returns, (priority, distance, location))
+        
+    def process_returns(self):
+        """Process returns in priority order"""
+        schedule = []
+        while self.returns:
+            priority, distance, location = heapq.heappop(self.returns)
+            schedule.append(location)
+        return schedule
+
+# Example usage
+rl = ReverseLogistics((0,0))
+rl.add_return((2,3), 1)
+rl.add_return((5,7), 2)
+rl.add_return((1,1), 0)  # Highest priority
+
+schedule = rl.process_returns()
+print("Return processing order:", schedule)
