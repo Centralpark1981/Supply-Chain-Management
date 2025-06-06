@@ -1,0 +1,8 @@
+# Given a service level, determine how many units to hold
+service_level = 0.95
+z = stats.norm.ppf(service_level)
+std_dev_demand = 80
+lead_time_days = 7
+
+service_criterion_units = z * std_dev_demand * np.sqrt(lead_time_days)
+print(f"Service Criterion (units to meet service level): {service_criterion_units:.2f}")
