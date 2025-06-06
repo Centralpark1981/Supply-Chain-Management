@@ -1,0 +1,13 @@
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+forecast_error_std = 60
+x = np.linspace(-3*forecast_error_std, 3*forecast_error_std, 1000)
+pdf = norm.pdf(x, 0, forecast_error_std)
+
+plt.plot(x, pdf)
+plt.title("Forecast Error Distribution")
+plt.xlabel("Forecast Error")
+plt.ylabel("Probability Density")
+plt.grid(True)
+plt.show()
