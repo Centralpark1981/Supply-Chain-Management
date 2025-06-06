@@ -1,0 +1,24 @@
+import pandas as pd
+
+# Sample data
+data = {
+    "Item": ["A", "B", "C", "D", "E"],
+    "AnnualDemand": [1000, 3000, 100, 500, 2000],
+    "UnitCost": [50, 10, 100, 25, 15]
+}
+
+df = pd.DataFrame(data)
+df["AnnualValue"] = df["AnnualDemand"] * df["UnitCost"]
+df = df.sort_values("AnnualValue", ascending=False)
+df["Cumulative%"] = 100 * df["AnnualValue"].cumsum() / df["AnnualValue"].sum()
+
+def abc_class(row):
+    if row["Cumulative%"] <= 80:
+        return "A"
+    elif row["Cumulative%"] <= 95:
+        return "B"
+    else:
+        return "C"
+
+df["Category"] = df.apply(abc_class, axis=1)
+print(df)
