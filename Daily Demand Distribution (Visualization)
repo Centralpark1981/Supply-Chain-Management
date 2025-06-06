@@ -1,0 +1,15 @@
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+mean_demand = 500
+std_dev_demand = 80
+
+x = np.linspace(mean_demand - 4*std_dev_demand, mean_demand + 4*std_dev_demand, 1000)
+pdf = norm.pdf(x, mean_demand, std_dev_demand)
+
+plt.plot(x, pdf)
+plt.title("Daily Demand Distribution")
+plt.xlabel("Units")
+plt.ylabel("Probability Density")
+plt.grid(True)
+plt.show()
