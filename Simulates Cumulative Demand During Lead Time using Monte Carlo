@@ -1,166 +1,87 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, FFMpegWriter
+import plotly.graph_objects as go
 from scipy import stats
 
-def monte_carlo_safety_stock_with_animation(
+def monte_carlo_safety_stock_plotly(
     daily_demand_samples,
     lead_time_days,
     service_level=0.95,
-    n_sim=500,
-    show=True,
-    save_path=None
+    n_sim=500
 ):
-    """
-    Monte Carlo Simulation with animated histogram for Safety Stock estimation.
-    Can show or save the animation.
-
-    Parameters:
-    - daily_demand_samples (list or np.array): A list or array of historical daily demand samples.
-    - lead_time_days (int): The lead time in days.
-    - service_level (float): The desired service level (e.95 for 95%).
-    - n_sim (int): The number of Monte Carlo simulations to run.
-    - show (bool): If True, display the animation.
-    - save_path (str, optional): If provided, save the animation to this file path (e.g., "output.mp4").
-
-    Returns:
-    - tuple: A tuple containing:
-        - float: The calculated safety stock.
-        - bool: True if the simulated demand distribution over lead time approximates a normal distribution (based on KS test), False otherwise.
-    """
-    # 1. Generate ALL simulation data ONCE
-    # This list will be the single source of truth for both the animation and the final calculation.
+    # Simulaciones
     lead_time_demands = [
         np.sum(np.random.choice(daily_demand_samples, size=lead_time_days))
         for _ in range(n_sim)
     ]
 
-    # Determine appropriate bins for the histogram
-    # We add a small margin to the max bin to ensure all data points are covered
-    min_demand_over_lt = min(daily_demand_samples) * lead_time_days
-    max_demand_over_lt = max(daily_demand_samples) * lead_time_days
+    min_demand = min(daily_demand_samples) * lead_time_days
+    max_demand = max(daily_demand_samples) * lead_time_days
+    bins = np.arange(min_demand, max_demand + max(daily_demand_samples) + 1, 1)
 
-    # Ensure bins cover the entire range, add a buffer, and step by 1 for discrete demand
-    bins = np.arange(
-        min_demand_over_lt,
-        max_demand_over_lt + max(daily_demand_samples) + 1, # Adding max_daily_demand to ensure the last possible sum is included
-        1
+    frames = []
+    for i in range(1, n_sim + 1, max(1, n_sim // 50)):  # Limit to ~50 steps
+        current_data = lead_time_demands[:i]
+        hist, bin_edges = np.histogram(current_data, bins=bins)
+        frames.append(go.Frame(
+            data=[go.Bar(x=bin_edges[:-1], y=hist)],
+            name=f"Sim {i}"
+        ))
+
+    # Layout
+    layout = go.Layout(
+        title="Monte Carlo Simulation of Demand Over Lead Time",
+        xaxis=dict(title="Total Demand over Lead Time"),
+        yaxis=dict(title="Frequency"),
+        updatemenus=[dict(
+            type="buttons",
+            showactive=False,
+            buttons=[dict(label="Play", method="animate", args=[None])]
+        )],
+        sliders=[dict(
+            steps=[dict(method="animate", args=[[f.name]], label=f.name) for f in frames],
+            transition=dict(duration=0),
+            x=0, y=0, currentvalue=dict(prefix="Simulation: ")
+        )]
     )
 
-    fig, ax = plt.subplots(figsize=(10, 6)) # Slightly larger figure for better visualization
-    ax.set_xlabel("Total Demand over Lead Time (Units)")
-    ax.set_ylabel("Frequency of Simulation Runs")
-    ax.set_title(f"Monte Carlo Simulation of Demand Over Lead Time")
+    fig = go.Figure(
+        data=[go.Bar(x=bins[:-1], y=np.zeros_like(bins[:-1]))],
+        layout=layout,
+        frames=frames
+    )
 
-    # Set x-axis limits to clearly define the range of possible demands
-    ax.set_xlim(bins[0], bins[-1])
+    fig.show()
 
-    # Initialize bars with zero height
-    bars = ax.bar(bins[:-1], np.zeros_like(bins[:-1]), width=1.0, align='edge', color='skyblue', label='Simulated Frequency')
+    # Calcular safety stock
+    sorted_data = np.sort(lead_time_demands)
+    demand_at_service_level = np.percentile(sorted_data, service_level * 100)
+    mean_demand = np.mean(lead_time_demands)
+    safety_stock = demand_at_service_level - mean_demand
 
-    # Add a text annotation for current simulation count
-    sim_text = ax.text(0.02, 0.98, '', transform=ax.transAxes, verticalalignment='top', fontsize=12)
-
-    def update(frame):
-        """
-        Update function for the animation.
-        This function is called for each frame of the animation.
-        """
-        # Use pre-generated data up to the current frame.
-        # '+1' because 'frame' is a 0-based index.
-        current_data = lead_time_demands[:frame + 1]
-
-        # Calculate histogram for the current data subset
-        hist, _ = np.histogram(current_data, bins=bins)
-
-        # Update the height of each bar
-        for count, bar in zip(hist, bars):
-            bar.set_height(count)
-
-        # Dynamically adjust y-axis limit based on current max frequency
-        # This prevents the bars from disappearing if a low frequency happens early
-        current_max_freq = hist.max() if hist.size > 0 else 0
-        if current_max_freq > ax.get_ylim()[1]:
-            ax.set_ylim(0, current_max_freq * 1.1) # Add 10% margin above max bar
-
-        # Update the title and text annotation to show progress
-        ax.set_title(f"Monte Carlo Simulation ({frame + 1}/{n_sim} runs)")
-        sim_text.set_text(f'Simulations: {frame + 1}/{n_sim}')
-
-        return bars + [sim_text] # Return all artists that were modified
-
-    if show or save_path:
-        # Create the animation
-        # blit=False is often more stable, especially with dynamically changing y-limits
-        anim = FuncAnimation(fig, update, frames=n_sim, repeat=False, blit=False, interval=20) # Faster interval for smoother animation
-
-    if save_path:
-        print(f"Saving animation to {save_path}...")
-        writer = FFMpegWriter(fps=30) # Frames per second for the output video
-        anim.save(save_path, writer=writer, dpi=200) # dpi for higher quality video
-        print(f"Animation saved to {save_path}")
-        plt.close(fig) # Close the figure after saving to free memory
-    elif show:
-        plt.tight_layout() # Adjust plot to prevent labels from overlapping
-        plt.show()
-    else:
-        plt.close(fig) # Close if neither showing nor saving
-
-    # Final calculation now uses the exact same data generated for the animation
-    # Sort the lead_time_demands to correctly calculate percentiles
-    sorted_lead_time_demands = np.sort(lead_time_demands)
-
-    # Calculate the demand at the desired service level
-    demand_at_service_level = np.percentile(sorted_lead_time_demands, service_level * 100)
-
-    # Calculate the average demand over lead time
-    average_demand_over_lead_time = np.mean(lead_time_demands)
-
-    # Safety stock is the difference between demand at service level and average demand
-    safety_stock = demand_at_service_level - average_demand_over_lead_time
-
-    # Perform Kolmogorov-Smirnov test for normality
-    # Check if there's enough data and variability for the test
+    # Normalidad
     if len(lead_time_demands) > 1 and np.std(lead_time_demands) > 0:
-        ks_stat, p_value = stats.kstest(lead_time_demands, 'norm', args=(average_demand_over_lead_time, np.std(lead_time_demands)))
+        ks_stat, p_value = stats.kstest(lead_time_demands, 'norm', args=(mean_demand, np.std(lead_time_demands)))
         is_normal = p_value > 0.05
     else:
-        is_normal = False # Cannot determine normality with insufficient data
+        is_normal = False
 
     return round(safety_stock, 2), is_normal
 
-# --- Sample Run ---
+
+# --- Ejemplo de uso ---
 if __name__ == "__main__":
-    # Example daily demand samples (e.g., from historical data)
     demand_samples = [45, 38, 52, 41, 49, 60, 40, 55, 48, 50]
     lead_time_days = 7
     service_level = 0.95
     n_sim = 1000
 
-    # Run the simulation and get results
-    calculated_safety_stock, normal_dist_check = monte_carlo_safety_stock_with_animation(
+    stock, is_normal = monte_carlo_safety_stock_plotly(
         daily_demand_samples=demand_samples,
         lead_time_days=lead_time_days,
         service_level=service_level,
-        n_sim=n_sim,          # Increased simulations for better distribution visualization
-        show=True,             # Set to True to display the animation window
-        save_path=None         # Set to "output.mp4" (or similar) to save the animation
+        n_sim=n_sim
     )
 
-    print(f"\n--- Simulation Results ---")
-    print(f"Daily Demand Samples: {demand_samples}")
-    print(f"Lead Time: {lead_time_days} days")
-    print(f"Desired Service Level: {service_level*100}%")
-    print(f"Number of Simulations: {n_sim}")
-    print(f"\nEstimated Safety Stock: {calculated_safety_stock} units")
-    print(f"Does the simulated demand distribution over lead time approximate a normal distribution? {'Yes' if normal_dist_check else 'No'}")
-
-    # Example of saving the animation without showing it
-    # monte_carlo_safety_stock_with_animation(
-    #     daily_demand_samples=demand_samples,
-    #     lead_time_days=7,
-    #     service_level=0.95,
-    #     n_sim=500,
-    #     show=False,
-    #     save_path="safety_stock_simulation.mp4"
-    # )
+    print("\n--- Resultados ---")
+    print(f"Safety Stock: {stock}")
+    print(f"Distribución aproximadamente normal: {'Sí' if is_normal else 'No'}")
