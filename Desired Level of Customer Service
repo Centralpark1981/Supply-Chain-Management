@@ -1,0 +1,3 @@
+# Can be predefined or input from business objective
+desired_service_level = 0.98
+print(f"Desired Customer Service Level: {desired_service_level * 100:.1f}%")
