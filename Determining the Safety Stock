@@ -1,0 +1,12 @@
+import scipy.stats as stats
+import numpy as np
+
+# Inputs
+std_dev_demand = 80
+lead_time_days = 10
+service_level = 0.95
+
+z = stats.norm.ppf(service_level)
+safety_stock = z * std_dev_demand * np.sqrt(lead_time_days)
+
+print(f"Safety Stock: {safety_stock:.2f} units")
