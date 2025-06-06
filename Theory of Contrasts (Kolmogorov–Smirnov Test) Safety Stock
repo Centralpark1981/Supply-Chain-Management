@@ -1,0 +1,93 @@
+import numpy as np
+import plotly.graph_objects as go
+from scipy import stats
+
+def monte_carlo_safety_stock_with_plotly(
+    daily_demand_samples,
+    lead_time_days,
+    service_level=0.95,
+    n_sim=1000,
+    alpha=0.05
+):
+    lead_time_demands = [
+        np.sum(np.random.choice(daily_demand_samples, size=lead_time_days))
+        for _ in range(n_sim)
+    ]
+
+    mean_demand = np.mean(lead_time_demands)
+    std_demand = np.std(lead_time_demands)
+    safety_stock = np.percentile(lead_time_demands, service_level * 100) - mean_demand
+
+    ks_stat, p_value = stats.kstest(lead_time_demands, 'norm', args=(mean_demand, std_demand))
+    reject_null = p_value < alpha
+
+    hist_data = np.histogram(lead_time_demands, bins=30, density=True)
+    bin_edges = hist_data[1]
+    bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+    hist_values = hist_data[0]
+
+    x = np.linspace(min(lead_time_demands), max(lead_time_demands), 500)
+    normal_pdf = stats.norm.pdf(x, mean_demand, std_demand)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=bin_centers,
+        y=hist_values,
+        name='Simulated Demand Distribution',
+        marker_color='lightblue',
+        opacity=0.7
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=normal_pdf,
+        mode='lines',
+        name='Normal Distribution',
+        line=dict(color='red', dash='dash')
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[mean_demand + safety_stock],
+        y=[max(hist_values) * 0.9],
+        mode='lines+text',
+        name='Safety Stock Threshold',
+        line=dict(color='green', dash='dot'),
+        text=[f'Safety Stock ({service_level*100:.0f}%)'],
+        textposition='top center'
+    ))
+
+    fig.update_layout(
+        title='Monte Carlo Simulation of Demand Over Lead Time',
+        xaxis_title='Total Demand over Lead Time',
+        yaxis_title='Density',
+        legend=dict(x=0.01, y=0.99),
+        template='plotly_white'
+    )
+
+    fig.show()
+
+    return {
+        "safety_stock": round(safety_stock, 2),
+        "mean_demand": round(mean_demand, 2),
+        "std_demand": round(std_demand, 2),
+        "ks_stat": round(ks_stat, 4),
+        "p_value": round(p_value, 4),
+        "reject_null": reject_null
+    }
+
+# Ejemplo de uso
+demand_samples = [45, 38, 52, 41, 49, 60, 40, 55, 48, 50]
+lead_time_days = 7
+service_level = 0.95
+n_sim = 1000
+
+resultados = monte_carlo_safety_stock_with_plotly(
+    daily_demand_samples=demand_samples,
+    lead_time_days=lead_time_days,
+    service_level=service_level,
+    n_sim=n_sim
+)
+
+for key, value in resultados.items():
+    print(f"{key}: {value}")
