@@ -1,0 +1,5 @@
+# Reverse: Given stockout probability, find Z
+stockout_prob = 0.05
+z_critical = stats.norm.ppf(1 - stockout_prob)
+
+print(f"Z-Critical Value for {1 - stockout_prob:.2%} service level: {z_critical:.2f}")
