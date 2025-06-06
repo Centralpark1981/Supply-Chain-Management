@@ -1,0 +1,3 @@
+lead_time_days = 10
+correction_factor = np.sqrt(lead_time_days)
+print(f"Time Period Correction Factor: {correction_factor:.2f}")
