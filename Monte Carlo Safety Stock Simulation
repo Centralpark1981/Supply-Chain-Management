@@ -1,0 +1,25 @@
+import numpy as np
+from scipy import stats
+
+def monte_carlo_safety_stock(daily_demand_samples, lead_time_days, service_level=0.95, n_sim=10000):
+    """Calculate safety stock using Monte Carlo simulation"""
+    # 1. Simulate demand during lead time
+    lead_time_demands = []
+    for _ in range(n_sim):
+        # Randomly sample demand days
+        demand_in_lead_time = np.sum(np.random.choice(daily_demand_samples, size=lead_time_days))
+        lead_time_demands.append(demand_in_lead_time)
+    
+    # 2. Calculate service level percentile
+    safety_stock = np.percentile(lead_time_demands, service_level*100) - np.mean(lead_time_demands)
+    
+    # 3. Test normality (Kolmogorov-Smirnov)
+    ks_stat, p_value = stats.kstest(lead_time_demands, 'norm')
+    is_normal = p_value > 0.05
+    
+    return round(safety_stock, 2), is_normal
+
+# Implementation
+demand_samples = [45, 38, 52, 41, 49, 60]  # Historical data
+safety_stock, normal_check = monte_carlo_safety_stock(demand_samples, lead_time_days=7, service_level=0.95)
+print(f"Safety Stock: {safety_stock} | Normal Distribution? {normal_check}")
